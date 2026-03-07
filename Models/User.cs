@@ -11,12 +11,13 @@ public class User
     public string Role { get; set; } = string.Empty;
     
     public string ProfilePictureUrl { get; set; } = string.Empty;
-    
-    public int TotalRatings { get; set; }
-    
+
+    public bool HasReserved { get; set; }
+
     public DateTime CreatedAt { get; set; }
     
     public DateTime LastLogin { get; set; }
     
     public bool IsActive { get; set; } = true;
+    //probando
 }

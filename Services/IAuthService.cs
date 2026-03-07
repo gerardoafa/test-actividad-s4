@@ -33,7 +33,7 @@ public interface IAuthService
      *   Error interno de FB
      */
    
-    Task<User> Register(RegisterDto registerDto);
+    Task<User> Register(global::RegisterDto registerDto);
    
     /**
      *   Login:
