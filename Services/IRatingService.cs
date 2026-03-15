@@ -1,7 +1,7 @@
 ﻿using ActividadS4.API.DTOs;
 using ActividadS4.API.Models;
 
-namespace Blockbuster.API.Services;
+namespace ActividadS4.API.Services;
 
 public interface IRatingService
 {

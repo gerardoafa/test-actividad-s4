@@ -43,6 +43,8 @@ public class RatingDto
      * CreatedAt cuando se escribio la reseña
      */
     public DateTime CreatedAt { get; set; }
+
+    public string MovieTitle { get; set; }
 }
 /// <summary>
 /// CreateRatingDto es lo que se recibe desde el backend cuando el usuario crea un rating
