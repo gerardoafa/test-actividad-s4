@@ -1,492 +1,470 @@
-﻿using ActividadS4.API.DTOs;
+using ActividadS4.API.DTOs;
 using ActividadS4.API.Models;
+using Google.Cloud.Firestore;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
-namespace ActividadS4.API.Services;
-
-public class RatingService : IRatingService
+namespace ActividadS4.API.Services
 {
     /// <summary>
-    /// RatingService implementa la gestión de calificaciones
-    /// Permite crear, obtener, editar y eliminar calificaciones de usuarios
+    /// RoomRatingService implementa la gestión de reseñas/calificaciones de habitaciones
+    /// Permite crear, obtener, editar y eliminar reseñas de huéspedes
     /// </summary>
-
-    private readonly FirebaseService _firebaseService;
-
-    private readonly IMovieService _movieService;
-    private readonly IAuthService _authService;
-
-    /// <summary>
-    /// Constructor: Recibe dependencias inyectadas
-    /// 
-    /// FirebaseService: Para acceder a Firestore
-    /// IMovieService: Para obtener/actualizar información de películas
-    /// IAuthService: Para obtener información de usuarios
-    /// </summary>
-    public RatingService(
-        FirebaseService firebaseService,
-        IMovieService movieService,
-        IAuthService authService)
+    public class RoomRatingService : IRoomRatingService
     {
-        _firebaseService = firebaseService;
-        _movieService = movieService;
-        _authService = authService;
-    }
+        private readonly FirebaseService _firebaseService;
+        private readonly IRoomService _roomService;
+        private readonly IAuthService _authService;
 
-    /// <summary>
-    /// GetRatingsByMovieId: Obtiene todas las calificaciones de una película
-    /// 
-    /// Se usa cuando se abre la página de detalles de una película
-    /// Muestra los reviews de otros usuarios ordenados por más reciente
-    /// 
-    /// Proceso:
-    /// 1. Obtener la colección "ratings"
-    /// 2. Filtrar por MovieId
-    /// 3. Ordenar por CreatedAt descendente
-    /// 4. Convertir a RatingDto
-    /// 5. Devolver lista
-    /// </summary>
-    public async Task<List<RatingDto>> GetRatingsByMovieId(string movieId)
-    {
-        try
+        /// <summary>
+        /// Constructor: Recibe dependencias inyectadas
+        /// </summary>
+        public RoomRatingService(
+            FirebaseService firebaseService,
+            IRoomService roomService,
+            IAuthService authService)
         {
-            // Validar entrada
-            if (string.IsNullOrWhiteSpace(movieId))
-            {
-                throw new ArgumentException("El ID de película es requerido");
-            }
-
-            var ratingsCollection = _firebaseService.GetCollection("ratings");
-
-            // Query: Obtener ratings donde MovieId == movieId
-            // OrderByDescending: Ordenar por más reciente primero
-            var query = ratingsCollection
-                .WhereEqualTo("MovieId", movieId)
-                .OrderByDescending("CreatedAt");
-
-            var snapshot = await query.GetSnapshotAsync();
-
-            // Convertir documentos a RatingDto
-            var ratings = new List<RatingDto>();
-            foreach (var doc in snapshot.Documents)
-            {
-                var rating = doc.ConvertTo<Rating>();
-                ratings.Add(ConvertToDto(rating));
-            }
-
-            return ratings;
+            _firebaseService = firebaseService;
+            _roomService = roomService;
+            _authService = authService;
         }
-        catch (Exception ex)
+
+        /// <summary>
+        /// GetRatingsByRoomId: Obtiene todas las reseñas de una habitación
+        /// </summary>
+        public async Task<List<ReservationRatingDto>> GetRatingsByRoomId(string roomId)
         {
-            Console.WriteLine($"Error al obtener ratings de película: {ex.Message}");
-            throw;
-        }
-    }
-
-    /// <summary>
-    /// GetRatingsByUserId: Obtiene todas las calificaciones hechas por un usuario
-    /// 
-    /// Se usa para mostrar el perfil del usuario
-    /// "Aquí están todas las películas que ha calificado"
-    /// 
-    /// Proceso:
-    /// 1. Filtrar ratings donde UserId == userId
-    /// 2. Ordenar por más reciente
-    /// 3. Convertir a RatingDto
-    /// 4. Devolver lista
-    /// </summary>
-    public async Task<List<RatingDto>> GetRatingsByUserId(string userId)
-    {
-        try
-        {
-            // Validar entrada
-            if (string.IsNullOrWhiteSpace(userId))
+            try
             {
-                throw new ArgumentException("El ID de usuario es requerido");
-            }
-
-            var ratingsCollection = _firebaseService.GetCollection("ratings");
-
-            // Query: Obtener ratings donde UserId == userId
-            var query = ratingsCollection
-                .WhereEqualTo("UserId", userId)
-                .OrderByDescending("CreatedAt");
-
-            var snapshot = await query.GetSnapshotAsync();
-
-            // Convertir documentos a RatingDto
-            var ratings = new List<RatingDto>();
-            foreach (var doc in snapshot.Documents)
-            {
-                var rating = doc.ConvertTo<Rating>();
-                ratings.Add(ConvertToDto(rating));
-            }
-
-            return ratings;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error al obtener ratings del usuario: {ex.Message}");
-            throw;
-        }
-    }
-
-    /// <summary>
-    /// CreateRating: Crea una nueva calificación
-    /// 
-    /// Este es el método más complejo porque:
-    /// 1. Valida que el usuario no haya calificado antes
-    /// 2. Actualiza el promedio de la película
-    /// 3. Incrementa contadores
-    /// 
-    /// Proceso:
-    /// 1. Validar que la película existe
-    /// 2. Validar que el usuario no ha calificado esta película
-    /// 3. Validar que el score está entre 1-10
-    /// 4. Crear documento Rating
-    /// 5. Actualizar AverageRating y TotalRatings de la película
-    /// 6. Incrementar TotalRatings del usuario
-    /// 7. Devolver la calificación creada
-    /// </summary>
-    public async Task<Rating> CreateRating(CreateRatingDto createRatingDto, string userId)
-    {
-        try
-        {
-            // Validar entrada
-            if (string.IsNullOrWhiteSpace(createRatingDto.MovieId))
-            {
-                throw new ArgumentException("El ID de película es requerido");
-            }
-
-            if (createRatingDto.Score < 1 || createRatingDto.Score > 10)
-            {
-                throw new ArgumentException("La calificación debe estar entre 1 y 10");
-            }
-
-            // Obtener la película para verificar que existe
-            var movieDto = await _movieService.GetMovieById(createRatingDto.MovieId);
-            if (movieDto == null)
-            {
-                throw new InvalidOperationException("La película no existe");
-            }
-
-            // Obtener el usuario para obtener su nombre
-            var user = await _authService.GetUserById(userId);
-            if (user == null)
-            {
-                throw new InvalidOperationException("El usuario no existe");
-            }
-
-            // Verificar que el usuario no ha calificado esta película antes
-            var hasRated = await HasUserRatedMovie(userId, createRatingDto.MovieId);
-            if (hasRated)
-            {
-                throw new InvalidOperationException("Ya has calificado esta película");
-            }
-
-            // Crear el nuevo rating
-            var newRating = new Rating
-            {
-                Id = Guid.NewGuid().ToString(),
-                MovieId = createRatingDto.MovieId,
-                MovieTitle = movieDto.Title,
-                UserId = userId,
-                UserName = user.Fullname,
-                Score = createRatingDto.Score,
-                Review = createRatingDto.Review ?? string.Empty,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
-            };
-
-            // Obtener todas las películas para recalcular promedio
-            var ratingsCollection = _firebaseService.GetCollection("ratings");
-            var moviesCollection = _firebaseService.GetCollection("movies");
-
-            // Guardar el nuevo rating
-            await ratingsCollection.Document(newRating.Id).SetAsync(newRating);
-
-            // Obtener todas las calificaciones de esta película (incluyendo la nueva)
-            var allRatingsForMovie = await ratingsCollection
-                .WhereEqualTo("MovieId", createRatingDto.MovieId)
-                .GetSnapshotAsync();
-
-            // Calcular el nuevo promedio
-            double totalScore = 0;
-            foreach (var doc in allRatingsForMovie.Documents)
-            {
-                var rating = doc.ConvertTo<Rating>();
-                totalScore += rating.Score;
-            }
-
-            double averageRating = totalScore / allRatingsForMovie.Count;
-
-            // Actualizar la película con el nuevo promedio y contador
-            await moviesCollection.Document(createRatingDto.MovieId).UpdateAsync(
-                new Dictionary<string, object>
+                // Validar entrada
+                if (string.IsNullOrWhiteSpace(roomId))
                 {
-                    { "AverageRating", averageRating },
-                    { "TotalRatings", allRatingsForMovie.Count }
+                    throw new ArgumentException("El ID de habitación es requerido");
                 }
-            );
 
-            // Actualizar TotalRatings del usuario
-            var usersCollection = _firebaseService.GetCollection("users");
-            await usersCollection.Document(userId).UpdateAsync(
-                new Dictionary<string, object>
+                var ratingsCollection = _firebaseService.GetCollection("roomRatings");
+
+                // Query: Obtener reseñas donde RoomId == roomId
+                // OrderByDescending: Ordenar por más reciente primero
+                var query = ratingsCollection
+                    .WhereEqualTo("RoomId", roomId)
+                    .OrderByDescending("CreatedAt");
+
+                var snapshot = await query.GetSnapshotAsync();
+
+                // Convertir documentos a ReservationRatingDto
+                var ratings = new List<ReservationRatingDto>();
+                foreach (var doc in snapshot.Documents)
                 {
-                    { "TotalRatings", user.TotalRatings + 1 }
+                    var ratingDict = doc.ToDictionary();
+                    var rating = ConvertDictToRating(ratingDict);
+                    ratings.Add(ConvertToDto(rating));
                 }
-            );
 
-            Console.WriteLine($"Rating creado: Usuario {userId} calificó película {createRatingDto.MovieId}");
-            return newRating;
+                return ratings;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error al obtener reseñas de habitación: {ex.Message}");
+                throw;
+            }
         }
-        catch (Exception ex)
+
+        /// <summary>
+        /// GetRatingsByUserId: Obtiene todas las reseñas hechas por un huésped
+        /// </summary>
+        public async Task<List<ReservationRatingDto>> GetRatingsByUserId(string userId)
         {
-            Console.WriteLine($"Error al crear rating: {ex.Message}");
-            throw;
-        }
-    }
-
-    /// <summary>
-    /// UpdateRating: Edita una calificación existente
-    /// 
-    /// Solo el propietario o un admin pueden editar
-    /// 
-    /// Proceso:
-    /// 1. Verificar que el rating existe
-    /// 2. Verificar que el usuario es propietario o admin
-    /// 3. Actualizar score y/o review
-    /// 4. Recalcular AverageRating de la película
-    /// 5. Devolver rating actualizado
-    /// </summary>
-    public async Task<Rating> UpdateRating(string ratingId, CreateRatingDto createRatingDto, string userId)
-    {
-        try
-        {
-            // Validar entrada
-            if (string.IsNullOrWhiteSpace(ratingId))
+            try
             {
-                throw new ArgumentException("El ID de rating es requerido");
-            }
-
-            if (createRatingDto.Score < 1 || createRatingDto.Score > 10)
-            {
-                throw new ArgumentException("La calificación debe estar entre 1 y 10");
-            }
-
-            var ratingsCollection = _firebaseService.GetCollection("ratings");
-            var moviesCollection = _firebaseService.GetCollection("movies");
-
-            // Obtener el rating existente
-            var ratingDoc = await ratingsCollection.Document(ratingId).GetSnapshotAsync();
-            if (!ratingDoc.Exists)
-            {
-                throw new InvalidOperationException("El rating no existe");
-            }
-
-            var existingRating = ratingDoc.ConvertTo<Rating>();
-
-            // Verificar que el usuario es propietario
-            if (existingRating.UserId != userId)
-            {
-                throw new UnauthorizedAccessException(
-                    "No tienes permiso para editar este rating"
-                );
-            }
-
-            // Actualizar score y review
-            existingRating.Score = createRatingDto.Score;
-            existingRating.Review = createRatingDto.Review ?? string.Empty;
-            existingRating.UpdatedAt = DateTime.UtcNow;
-
-            // Guardar cambios
-            await ratingsCollection.Document(ratingId).SetAsync(existingRating);
-
-            // Recalcular promedio de la película
-            var allRatingsForMovie = await ratingsCollection
-                .WhereEqualTo("MovieId", existingRating.MovieId)
-                .GetSnapshotAsync();
-
-            double totalScore = 0;
-            foreach (var doc in allRatingsForMovie.Documents)
-            {
-                var rating = doc.ConvertTo<Rating>();
-                totalScore += rating.Score;
-            }
-
-            double averageRating = totalScore / allRatingsForMovie.Count;
-
-            // Actualizar la película
-            await moviesCollection.Document(existingRating.MovieId).UpdateAsync(
-                new Dictionary<string, object>
+                // Validar entrada
+                if (string.IsNullOrWhiteSpace(userId))
                 {
-                    { "AverageRating", averageRating }
+                    throw new ArgumentException("El ID de usuario es requerido");
                 }
-            );
 
-            Console.WriteLine($"Rating actualizado: {ratingId}");
-            return existingRating;
+                var ratingsCollection = _firebaseService.GetCollection("roomRatings");
+
+                // Query: Obtener reseñas donde UserId == userId
+                var query = ratingsCollection
+                    .WhereEqualTo("UserId", userId)
+                    .OrderByDescending("CreatedAt");
+
+                var snapshot = await query.GetSnapshotAsync();
+
+                // Convertir documentos a ReservationRatingDto
+                var ratings = new List<ReservationRatingDto>();
+                foreach (var doc in snapshot.Documents)
+                {
+                    var ratingDict = doc.ToDictionary();
+                    var rating = ConvertDictToRating(ratingDict);
+                    ratings.Add(ConvertToDto(rating));
+                }
+
+                return ratings;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error al obtener reseñas del usuario: {ex.Message}");
+                throw;
+            }
         }
-        catch (Exception ex)
+
+        /// <summary>
+        /// CreateRating: Crea una nueva reseña/calificación de habitación
+        /// </summary>
+        public async Task<ReservationRating> CreateRating(CreateReservationRatingDto createRatingDto, string userId)
         {
-            Console.WriteLine($"Error al actualizar rating: {ex.Message}");
-            throw;
-        }
-    }
-
-    /// <summary>
-    /// DeleteRating: Elimina una calificación
-    /// 
-    /// Solo el propietario o admin pueden eliminar
-    /// 
-    /// Proceso:
-    /// 1. Verificar que el rating existe
-    /// 2. Verificar que el usuario es propietario
-    /// 3. Eliminar el rating
-    /// 4. Recalcular AverageRating de la película
-    /// 5. Decrementar contadores
-    /// </summary>
-    public async Task DeleteRating(string ratingId, string userId)
-    {
-        try
-        {
-            // Validar entrada
-            if (string.IsNullOrWhiteSpace(ratingId))
+            try
             {
-                throw new ArgumentException("El ID de rating es requerido");
-            }
+                // Validar entrada
+                if (string.IsNullOrWhiteSpace(createRatingDto.RoomId))
+                {
+                    throw new ArgumentException("El ID de habitación es requerido");
+                }
+                if (createRatingDto.Score < 1 || createRatingDto.Score > 5)
+                {
+                    throw new ArgumentException("La calificación debe estar entre 1 y 5");
+                }
 
-            var ratingsCollection = _firebaseService.GetCollection("ratings");
-            var moviesCollection = _firebaseService.GetCollection("movies");
-            var usersCollection = _firebaseService.GetCollection("users");
+                // Obtener la habitación para verificar que existe y obtener su nombre
+                var roomDto = await _roomService.GetRoomById(createRatingDto.RoomId);
+                if (roomDto == null)
+                {
+                    throw new InvalidOperationException("La habitación no existe");
+                }
 
-            // Obtener el rating
-            var ratingDoc = await ratingsCollection.Document(ratingId).GetSnapshotAsync();
-            if (!ratingDoc.Exists)
-            {
-                throw new InvalidOperationException("El rating no existe");
-            }
+                // Obtener el usuario para obtener su nombre
+                var user = await _authService.GetUserById(userId);
+                if (user == null)
+                {
+                    throw new InvalidOperationException("El usuario no existe");
+                }
 
-            var rating = ratingDoc.ConvertTo<Rating>();
+                // Verificar que el usuario no ha calificado esta habitación antes
+                var hasRated = await HasUserRatedRoom(userId, createRatingDto.RoomId);
+                if (hasRated)
+                {
+                    throw new InvalidOperationException("Ya has calificado esta habitación");
+                }
 
-            // Verificar que el usuario es propietario
-            if (rating.UserId != userId)
-            {
-                throw new UnauthorizedAccessException(
-                    "No tienes permiso para eliminar este rating"
-                );
-            }
+                // Crear la nueva reseña
+                var newRating = new ReservationRating
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    RoomId = createRatingDto.RoomId,
+                    RoomNameOrNumber = roomDto.NumberOrName,
+                    UserId = userId,
+                    GuestName = user.FullName,
+                    Score = createRatingDto.Score,
+                    Review = createRatingDto.Review ?? string.Empty,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
 
-            // Eliminar el rating
-            await ratingsCollection.Document(ratingId).DeleteAsync();
+                var ratingsCollection = _firebaseService.GetCollection("roomRatings");
+                var roomsCollection = _firebaseService.GetCollection("rooms");
 
-            // Recalcular promedio de la película
-            var allRatingsForMovie = await ratingsCollection
-                .WhereEqualTo("MovieId", rating.MovieId)
-                .GetSnapshotAsync();
+                // Guardar la nueva reseña usando Dictionary
+                var ratingData = new Dictionary<string, object>
+                {
+                    { "Id", newRating.Id },
+                    { "RoomId", newRating.RoomId },
+                    { "RoomNameOrNumber", newRating.RoomNameOrNumber },
+                    { "UserId", newRating.UserId },
+                    { "GuestName", newRating.GuestName },
+                    { "Score", newRating.Score },
+                    { "Review", newRating.Review },
+                    { "CreatedAt", newRating.CreatedAt },
+                    { "UpdatedAt", newRating.UpdatedAt }
+                };
 
-            // Si no hay más ratings, el promedio es 0
-            double averageRating = 0;
-            int totalRatings = allRatingsForMovie.Count;
+                await ratingsCollection.Document(newRating.Id).SetAsync(ratingData);
 
-            if (totalRatings > 0)
-            {
+                // Obtener todas las reseñas de esta habitación (incluyendo la nueva)
+                var allRatingsForRoom = await ratingsCollection
+                    .WhereEqualTo("RoomId", createRatingDto.RoomId)
+                    .GetSnapshotAsync();
+
+                // Calcular el nuevo promedio
                 double totalScore = 0;
-                foreach (var doc in allRatingsForMovie.Documents)
+                foreach (var doc in allRatingsForRoom.Documents)
                 {
-                    var r = doc.ConvertTo<Rating>();
-                    totalScore += r.Score;
+                    var rating = doc.ToDictionary();
+                    totalScore += Convert.ToDouble(rating["Score"]);
                 }
+                double averageRating = totalScore / allRatingsForRoom.Count;
 
-                averageRating = totalScore / totalRatings;
+                // Actualizar la habitación con el nuevo promedio y contador
+                await roomsCollection.Document(createRatingDto.RoomId).UpdateAsync(
+                    new Dictionary<string, object>
+                    {
+                        { "AverageRating", averageRating },
+                        { "TotalRatings", allRatingsForRoom.Count }
+                    }
+                );
+
+                // Actualizar TotalRatings del usuario (si lo tienes en el modelo User)
+                var usersCollection = _firebaseService.GetCollection("users");
+                await usersCollection.Document(userId).UpdateAsync(
+                    new Dictionary<string, object>
+                    {
+                        { "TotalRatings", user.TotalRatings + 1 }
+                    }
+                );
+
+                Console.WriteLine($"Reseña creada: Huésped {userId} calificó habitación {createRatingDto.RoomId}");
+                return newRating;
             }
-
-            // Actualizar la película
-            await moviesCollection.Document(rating.MovieId).UpdateAsync(
-                new Dictionary<string, object>
-                {
-                    { "AverageRating", averageRating },
-                    { "TotalRatings", totalRatings }
-                }
-            );
-
-            // Decrementar TotalRatings del usuario
-            var userDoc = await usersCollection.Document(userId).GetSnapshotAsync();
-            var user = userDoc.ConvertTo<User>();
-
-            await usersCollection.Document(userId).UpdateAsync(
-                new Dictionary<string, object>
-                {
-                    { "TotalRatings", Math.Max(0, user.TotalRatings - 1) }
-                }
-            );
-
-            Console.WriteLine($"Rating eliminado: {ratingId}");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error al eliminar rating: {ex.Message}");
-            throw;
-        }
-    }
-
-    /// <summary>
-    /// HasUserRatedMovie: Verifica si un usuario ya calificó una película
-    /// 
-    /// Se usa antes de crear una nueva calificación
-    /// Para evitar que el mismo usuario califique dos veces
-    /// 
-    /// Proceso:
-    /// 1. Filtrar ratings donde UserId == userId AND MovieId == movieId
-    /// 2. Si hay resultados, devolver true
-    /// 3. Si no hay, devolver false
-    /// </summary>
-    public async Task<bool> HasUserRatedMovie(string userId, string movieId)
-    {
-        try
-        {
-            // Validar entrada
-            if (string.IsNullOrWhiteSpace(userId) || string.IsNullOrWhiteSpace(movieId))
+            catch (Exception ex)
             {
-                return false;
+                Console.WriteLine($"Error al crear reseña: {ex.Message}");
+                throw;
             }
-
-            var ratingsCollection = _firebaseService.GetCollection("ratings");
-
-            // Query: Buscar rating donde UserId == userId Y MovieId == movieId
-            var query = ratingsCollection
-                .WhereEqualTo("UserId", userId)
-                .WhereEqualTo("MovieId", movieId);
-
-            var snapshot = await query.GetSnapshotAsync();
-
-            // Si hay al menos un resultado, el usuario ya calificó
-            return snapshot.Count > 0;
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error al verificar si usuario calificó película: {ex.Message}");
-            throw;
-        }
-    }
 
-    /// <summary>
-    /// Método privado auxiliar: ConvertToDto
-    /// 
-    /// Convierte un Rating (modelo interno) a RatingDto (lo que se envía al frontend)
-    /// Es privado porque solo lo usa internamente RatingService
-    /// </summary>
-    private RatingDto ConvertToDto(Rating rating)
-    {
-        return new RatingDto
+        /// <summary>
+        /// UpdateRating: Edita una reseña existente
+        /// </summary>
+        public async Task<ReservationRating> UpdateRating(string ratingId, CreateReservationRatingDto createRatingDto, string userId)
         {
-            Id = rating.Id,
-            MovieId = rating.MovieId,
-            MovieTitle = rating.MovieTitle,
-            Score = rating.Score,
-            Review = rating.Review,
-            UserName = rating.UserName,
-            CreatedAt = rating.CreatedAt
-        };
+            try
+            {
+                // Validar entrada
+                if (string.IsNullOrWhiteSpace(ratingId))
+                {
+                    throw new ArgumentException("El ID de reseña es requerido");
+                }
+                if (createRatingDto.Score < 1 || createRatingDto.Score > 5)
+                {
+                    throw new ArgumentException("La calificación debe estar entre 1 y 5");
+                }
+
+                var ratingsCollection = _firebaseService.GetCollection("roomRatings");
+                var roomsCollection = _firebaseService.GetCollection("rooms");
+
+                // Obtener la reseña existente
+                var ratingDoc = await ratingsCollection.Document(ratingId).GetSnapshotAsync();
+                if (!ratingDoc.Exists)
+                {
+                    throw new InvalidOperationException("La reseña no existe");
+                }
+
+                var existingDict = ratingDoc.ToDictionary();
+                var existingRating = ConvertDictToRating(existingDict);
+
+                // Verificar que el usuario es propietario
+                if (existingRating.UserId != userId)
+                {
+                    throw new UnauthorizedAccessException("No tienes permiso para editar esta reseña");
+                }
+
+                // Actualizar score y review
+                existingRating.Score = createRatingDto.Score;
+                existingRating.Review = createRatingDto.Review ?? string.Empty;
+                existingRating.UpdatedAt = DateTime.UtcNow;
+
+                // Guardar cambios usando Dictionary
+                var ratingData = new Dictionary<string, object>
+                {
+                    { "Id", existingRating.Id },
+                    { "RoomId", existingRating.RoomId },
+                    { "RoomNameOrNumber", existingRating.RoomNameOrNumber },
+                    { "UserId", existingRating.UserId },
+                    { "GuestName", existingRating.GuestName },
+                    { "Score", existingRating.Score },
+                    { "Review", existingRating.Review },
+                    { "CreatedAt", existingRating.CreatedAt },
+                    { "UpdatedAt", existingRating.UpdatedAt }
+                };
+
+                await ratingsCollection.Document(ratingId).SetAsync(ratingData);
+
+                // Recalcular promedio de la habitación
+                var allRatingsForRoom = await ratingsCollection
+                    .WhereEqualTo("RoomId", existingRating.RoomId)
+                    .GetSnapshotAsync();
+
+                double totalScore = 0;
+                foreach (var doc in allRatingsForRoom.Documents)
+                {
+                    var rating = doc.ToDictionary();
+                    totalScore += Convert.ToDouble(rating["Score"]);
+                }
+                double averageRating = totalScore / allRatingsForRoom.Count;
+
+                // Actualizar la habitación
+                await roomsCollection.Document(existingRating.RoomId).UpdateAsync(
+                    new Dictionary<string, object>
+                    {
+                        { "AverageRating", averageRating }
+                    }
+                );
+
+                Console.WriteLine($"Reseña actualizada: {ratingId}");
+                return existingRating;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error al actualizar reseña: {ex.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// DeleteRating: Elimina una reseña
+        /// </summary>
+        public async Task DeleteRating(string ratingId, string userId)
+        {
+            try
+            {
+                // Validar entrada
+                if (string.IsNullOrWhiteSpace(ratingId))
+                {
+                    throw new ArgumentException("El ID de reseña es requerido");
+                }
+
+                var ratingsCollection = _firebaseService.GetCollection("roomRatings");
+                var roomsCollection = _firebaseService.GetCollection("rooms");
+                var usersCollection = _firebaseService.GetCollection("users");
+
+                // Obtener la reseña
+                var ratingDoc = await ratingsCollection.Document(ratingId).GetSnapshotAsync();
+                if (!ratingDoc.Exists)
+                {
+                    throw new InvalidOperationException("La reseña no existe");
+                }
+
+                var ratingDict = ratingDoc.ToDictionary();
+                var rating = ConvertDictToRating(ratingDict);
+
+                // Verificar que el usuario es propietario
+                if (rating.UserId != userId)
+                {
+                    throw new UnauthorizedAccessException("No tienes permiso para eliminar esta reseña");
+                }
+
+                // Eliminar la reseña
+                await ratingsCollection.Document(ratingId).DeleteAsync();
+
+                // Recalcular promedio de la habitación
+                var allRatingsForRoom = await ratingsCollection
+                    .WhereEqualTo("RoomId", rating.RoomId)
+                    .GetSnapshotAsync();
+
+                // Si no hay más reseñas, el promedio es 0
+                double averageRating = 0;
+                int totalRatings = allRatingsForRoom.Count;
+                if (totalRatings > 0)
+                {
+                    double totalScore = 0;
+                    foreach (var doc in allRatingsForRoom.Documents)
+                    {
+                        var r = doc.ToDictionary();
+                        totalScore += Convert.ToDouble(r["Score"]);
+                    }
+                    averageRating = totalScore / totalRatings;
+                }
+
+                // Actualizar la habitación
+                await roomsCollection.Document(rating.RoomId).UpdateAsync(
+                    new Dictionary<string, object>
+                    {
+                        { "AverageRating", averageRating },
+                        { "TotalRatings", totalRatings }
+                    }
+                );
+
+                // Decrementar TotalRatings del usuario
+                var userDoc = await usersCollection.Document(userId).GetSnapshotAsync();
+                var userDict = userDoc.ToDictionary();
+                var userTotalRatings = (int)(long)userDict["TotalRatings"];
+                await usersCollection.Document(userId).UpdateAsync(
+                    new Dictionary<string, object>
+                    {
+                        { "TotalRatings", Math.Max(0, userTotalRatings - 1) }
+                    }
+                );
+
+                Console.WriteLine($"Reseña eliminada: {ratingId}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error al eliminar reseña: {ex.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// HasUserRatedRoom: Verifica si un huésped ya calificó una habitación
+        /// </summary>
+        public async Task<bool> HasUserRatedRoom(string userId, string roomId)
+        {
+            try
+            {
+                // Validar entrada
+                if (string.IsNullOrWhiteSpace(userId) || string.IsNullOrWhiteSpace(roomId))
+                {
+                    return false;
+                }
+
+                var ratingsCollection = _firebaseService.GetCollection("roomRatings");
+
+                // Query: Buscar reseña donde UserId == userId Y RoomId == roomId
+                var query = ratingsCollection
+                    .WhereEqualTo("UserId", userId)
+                    .WhereEqualTo("RoomId", roomId);
+
+                var snapshot = await query.GetSnapshotAsync();
+
+                // Si hay al menos un resultado, el usuario ya calificó
+                return snapshot.Count > 0;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error al verificar si usuario calificó habitación: {ex.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Método privado auxiliar: ConvertToDto
+        /// Convierte un ReservationRating (modelo interno) a ReservationRatingDto
+        /// </summary>
+        private ReservationRatingDto ConvertToDto(ReservationRating rating)
+        {
+            return new ReservationRatingDto
+            {
+                Id = rating.Id,
+                RoomId = rating.RoomId,
+                RoomNameOrNumber = rating.RoomNameOrNumber,
+                Score = rating.Score,
+                Review = rating.Review,
+                GuestName = rating.GuestName,
+                CreatedAt = rating.CreatedAt
+            };
+        }
+
+        /// <summary>
+        /// Método privado auxiliar: ConvertDictToRating
+        /// Convierte un diccionario de Firestore a objeto ReservationRating
+        /// </summary>
+        private ReservationRating ConvertDictToRating(Dictionary<string, object> dict)
+        {
+            return new ReservationRating
+            {
+                Id = dict["Id"].ToString(),
+                RoomId = dict["RoomId"].ToString(),
+                RoomNameOrNumber = dict["RoomNameOrNumber"].ToString(),
+                UserId = dict["UserId"].ToString(),
+                GuestName = dict["GuestName"].ToString(),
+                Score = Convert.ToDouble(dict["Score"]),
+                Review = dict["Review"].ToString(),
+                CreatedAt = ((Timestamp)dict["CreatedAt"]).ToDateTime(),
+                UpdatedAt = ((Timestamp)dict["UpdatedAt"]).ToDateTime()
+            };
+        }
     }
 }
