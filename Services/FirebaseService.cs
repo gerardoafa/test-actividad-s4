@@ -59,7 +59,7 @@ public class FirebaseService
              * El archivo contiene multiples propiedades, pero solo ocupamos el pid
              */
             var projectId = GetProjectIdFromCredentials(credentialsPath);
-            
+
             /*
              * Paso 4: Establecer variable de entorno GOOGLE_APPLICATION_CRENDENTIALS
              * Esta es una variable de entorno que Google SDK busca automaticamente
@@ -67,10 +67,10 @@ public class FirebaseService
              * Sin esto, Google no sabe a que proyecto consumir
              */
             Environment.SetEnvironmentVariable(
-                "GOOGLE_APPLICATION_CRENDENTIALS",
-                credentialsPath
-                );
-            
+            "GOOGLE_APPLICATION_CREDENTIALS",   
+            credentialsPath
+            );
+
             /*
              * Paso 5: Inicializar FB SDK
              * FB necesita credenciales para saber a que proyecto conectarse

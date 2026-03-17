@@ -11,7 +11,7 @@ public class UserDto
     
     /**
      * Fullname nombre visible del usuario
-     * Se muestre en sus ratings
+     * 
      */
     public string FullName { get; set; } = string.Empty;
     
@@ -29,7 +29,22 @@ public class UserDto
      * ProfilePictureUrl foto de perfil
      */
     public string ProfilePictureUrl { get; set; } = string.Empty;
-    
+
+    /**
+     * Indica si el huésped ya realizó su reserva única
+     */
+    public bool HasReserved { get; set; }
+
+    /**
+     * ID de la habitación que reservó (vacío si no ha reservado)
+     */
+    public string ReservedRoom { get; set; } = string.Empty;
+
+    /**
+     * Fechas de su reserva en formato "CheckIn - CheckOut"
+     */
+    public string ReservedDates { get; set; } = string.Empty;
+
     /**
      * TotalRatings cuantas ha calificado
      */
