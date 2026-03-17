@@ -1,68 +1,78 @@
-﻿/// <summary>
-/// RatingDto es lo que se envia cuando el frontend quiere:
-/// 1. Ver las calificaciones de una pelicula (GET)
-/// 2. Crear una nueva calificacion (POST)
-/// 3. Editar una calificacion existente (PUT)
+/// <summary>
+/// DTO para manejar las reseñas/calificaciones que los huéspedes dejan sobre una habitación.
+/// Se usa en:
+/// 1. Listar reseñas de una habitación (GET)
+/// 2. Crear una nueva reseña (POST)
+/// 3. Editar una reseña existente (PUT) – si el sistema lo permite
 /// </summary>
-
-public class RatingDto
+public class ReservationRatingDto
 {
-    /**
-     * Id: identificador de la calificacion
-     * Solo se incluye cuando se envia una calificacion existente (GET)
-     * Es null cuando se crea una nueva (POST)
-     */
-    
+    /// <summary>
+    /// ID único de la reseña
+    /// Viene lleno en respuestas GET y PUT
+    /// No se envía ni se usa al crear (POST)
+    /// </summary>
     public string Id { get; set; } = string.Empty;
-    
-    /**
-     * MovieId para mostrar rapidamente que pelicula es
-     * El frontend no tiene que hacer otra llamada para saberlo
-     */
-    public string MovieId { get; set; } = string.Empty;
-    
-    /**
-     * Score la calificacion de 1-10
-     * El frontend valida que este entre 1 y 10
-     */
+
+    /// <summary>
+    /// ID de la habitación que se está calificando
+    /// Permite al frontend mostrar rápidamente de qué habitación es
+    /// </summary>
+    public string RoomId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Nombre o número visible de la habitación (ej: "101", "Suite Deluxe")
+    /// Para mostrar al usuario sin tener que hacer otra llamada
+    /// </summary>
+    public string RoomNameOrNumber { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Puntuación dada por el huésped (rango recomendado: 1.0 a 5.0)
+    /// El frontend debe validar el rango
+    /// </summary>
     public double Score { get; set; }
-    
-    /**
-     * Review es el comentario que va dejar el usuario
-     * Puede estar vacio (nullable) si solamente quiere calificar
-     */
+
+    /// <summary>
+    /// Comentario/texto de la reseña
+    /// Puede estar vacío si el huésped solo pone puntuación
+    /// </summary>
     public string Review { get; set; } = string.Empty;
-    
-    /**
-     * Username es quien escribio la calificacion
-     * Se muestra debajo del comentario
-     */
-    public string UserName  { get; set; } = string.Empty;
-    
-    /**
-     * CreatedAt cuando se escribio la reseña
-     */
+
+    /// <summary>
+    /// Nombre visible del huésped que escribió la reseña
+    /// (puede ser nombre completo, nombre + inicial, o nickname según reglas del hotel)
+    /// </summary>
+    public string GuestName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Fecha y hora en que se creó la reseña
+    /// Útil para ordenar y mostrar antigüedad
+    /// </summary>
     public DateTime CreatedAt { get; set; }
 
-    public string MovieTitle { get; set; }
+    // Opcional: si permites actualización posterior
+    public DateTime? UpdatedAt { get; set; }
 }
+
 /// <summary>
-/// CreateRatingDto es lo que se recibe desde el backend cuando el usuario crea un rating
-/// Solo contiene lo necesario
+/// DTO que recibe el backend cuando un huésped crea una nueva reseña.
+/// Solo contiene los campos que el usuario debe enviar.
 /// </summary>
-public class CreateRatingDto
+public class CreateReservationRatingDto
 {
-    /**
-     * MovieId para saber la pelicula exacta
-     */
-    public string MovieId { get; set; } = string.Empty;
-    /**
-     * La calificaion que le otorga
-     */
+    /// <summary>
+    /// ID de la habitación que se va a calificar
+    /// (normalmente viene del contexto de la reserva confirmada)
+    /// </summary>
+    public string RoomId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Puntuación otorgada (1.0 a 5.0 normalmente)
+    /// </summary>
     public double Score { get; set; }
-    
-    /**
-     * El comentario de su opinion (si aplica)
-     */
+
+    /// <summary>
+    /// Comentario o texto de la experiencia (opcional)
+    /// </summary>
     public string Review { get; set; } = string.Empty;
 }
