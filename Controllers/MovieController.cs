@@ -1,168 +1,158 @@
-﻿using ActividadS4.API.Models;
+using ActividadS4.API.DTOs;
+using ActividadS4.API.Models;
 using ActividadS4.API.Services;
-
-namespace ActividadS4.API.Controllers;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-
-/// <summary>
-/// MovieController maneja todo lo relacionado con películas
-/// Endpoints para obtener, crear, editar y eliminar películas
-/// </summary>
-[ApiController]
-[Route("api/[controller]")]
-public class MovieController : ControllerBase
+namespace ActividadS4.API.Controllers
 {
-    private readonly IMovieService _movieService;
-        private readonly ILogger<MovieController> _logger;
+    /// <summary>
+    /// RoomsController maneja todo lo relacionado con habitaciones
+    /// Endpoints para obtener, crear, editar y eliminar habitaciones
+    /// </summary>
+    [ApiController]
+    [Route("api/[controller]")]
+    public class RoomsController : ControllerBase
+    {
+        private readonly IRoomService _roomService;
+        private readonly ILogger<RoomsController> _logger;
 
         /// <summary>
-        /// Constructor: Recibe IMovieService inyectado
+        /// Constructor: Recibe IRoomService inyectado
         /// </summary>
-        public MovieController(IMovieService movieService, ILogger<MovieController> logger)
+        public RoomsController(IRoomService roomService, ILogger<RoomsController> logger)
         {
-            _movieService = movieService;
+            _roomService = roomService;
             _logger = logger;
         }
 
         /// <summary>
-        /// GET /api/movie
-        /// 
-        /// Obtiene todas las películas (con filtro opcional por género)
-        /// 
+        /// GET /api/rooms
+        ///
+        /// Obtiene todas las habitaciones (con filtro opcional por tipo)
+        ///
         /// Parámetros query (opcional):
-        ///   genre: Filtrar por género específico
-        ///   Ejemplo: GET /api/movie?genre=Action
-        /// 
+        /// type: Filtrar por tipo de habitación específico
+        /// Ejemplo: GET /api/rooms?type=Suite
+        ///
         /// Respuesta exitosa (200):
         /// [
         ///   {
-        ///     "id": "movie_001",
-        ///     "title": "Inception",
-        ///     "description": "...",
-        ///     "genre": "Science Fiction",
-        ///     "releaseYear": 2010,
-        ///     "averageRating": 8.5,
-        ///     "totalRatings": 150
+        ///     "id": "room_001",
+        ///     "numberOrName": "101",
+        ///     "type": "Estándar",
+        ///     "capacity": 2,
+        ///     "description": "Habitación cómoda con cama queen...",
+        ///     "basePricePerNight": 120.00,
+        ///     "averageRating": 4.7,
+        ///     "totalRatings": 45
         ///   }
         /// ]
         /// </summary>
         [HttpGet]
-        public async Task<IActionResult> GetAllMovies([FromQuery] string? genre = null)
+        public async Task<IActionResult> GetAllRooms([FromQuery] string? type = null)
         {
             try
             {
-                var movies = await _movieService.GetAllMovies(genre);
-                return Ok(movies);
+                var rooms = await _roomService.GetAllRooms(type);
+                return Ok(rooms);
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Error al obtener películas: {ex.Message}");
-                return StatusCode(500, new { message = "Error al obtener películas" });
+                _logger.LogError($"Error al obtener habitaciones: {ex.Message}");
+                return StatusCode(500, new { message = "Error al obtener habitaciones" });
             }
         }
 
         /// <summary>
-        /// GET /api/movie/{movieId}
-        /// 
-        /// Obtiene una película específica por su ID
-        /// 
+        /// GET /api/rooms/{roomId}
+        ///
+        /// Obtiene una habitación específica por su ID
+        ///
         /// Parámetro:
-        ///   movieId: ID de la película (en la URL)
-        /// 
-        /// Respuesta exitosa (200):
-        /// {
-        ///   "id": "movie_001",
-        ///   "title": "Inception",
-        ///   "description": "...",
-        ///   "genre": "Science Fiction",
-        ///   "releaseYear": 2010,
-        ///   "posterUrl": "https://...",
-        ///   "averageRating": 8.5,
-        ///   "totalRatings": 150
-        /// }
-        /// 
+        /// roomId: ID de la habitación (en la URL)
+        ///
+        /// Respuesta exitosa (200): Detalle completo de la habitación
+        ///
         /// Errores:
-        /// 404: Película no encontrada
+        /// 404: Habitación no encontrada
         /// </summary>
-        [HttpGet("{movieId}")]
-        public async Task<IActionResult> GetMovieById(string movieId)
+        [HttpGet("{roomId}")]
+        public async Task<IActionResult> GetRoomById(string roomId)
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(movieId))
+                if (string.IsNullOrWhiteSpace(roomId))
                 {
-                    return BadRequest(new { message = "El ID de película es requerido" });
+                    return BadRequest(new { message = "El ID de habitación es requerido" });
                 }
 
-                var movie = await _movieService.GetMovieById(movieId);
-
-                if (movie == null)
+                var room = await _roomService.GetRoomById(roomId);
+                if (room == null)
                 {
-                    return NotFound(new { message = "Película no encontrada" });
+                    return NotFound(new { message = "Habitación no encontrada" });
                 }
 
-                return Ok(movie);
+                return Ok(room);
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Error al obtener película: {ex.Message}");
-                return StatusCode(500, new { message = "Error al obtener película" });
+                _logger.LogError($"Error al obtener habitación: {ex.Message}");
+                return StatusCode(500, new { message = "Error al obtener habitación" });
             }
         }
 
         /// <summary>
-        /// POST /api/movie
-        /// 
-        /// Crea una nueva película (SOLO ADMIN)
-        /// 
+        /// POST /api/rooms
+        ///
+        /// Crea una nueva habitación (SOLO GERENTE)
+        ///
         /// Header requerido:
-        ///   Authorization: Bearer {token}
-        /// 
+        /// Authorization: Bearer {token}
+        ///
         /// Cuerpo esperado (JSON):
         /// {
-        ///   "title": "Inception",
-        ///   "description": "A skilled thief...",
-        ///   "genre": "Science Fiction",
-        ///   "releaseYear": 2010,
-        ///   "posterUrl": "https://..."
+        ///   "numberOrName": "205",
+        ///   "type": "Suite Deluxe",
+        ///   "capacity": 4,
+        ///   "description": "Suite con vista al mar, jacuzzi y minibar",
+        ///   "basePricePerNight": 250.00
         /// }
-        /// 
-        /// Respuesta exitosa (201):
-        /// {
-        ///   "id": "movie_001",
-        ///   "title": "Inception",
-        ///   ...
-        /// }
-        /// 
+        ///
+        /// Respuesta exitosa (201): Habitación creada
+        ///
         /// Errores:
         /// 400: Datos inválidos
         /// 401: No autenticado
-        /// 403: No es administrador
+        /// 403: No es gerente
         /// </summary>
+        [Authorize(Roles = "Gerente")]
         [HttpPost]
-        public async Task<IActionResult> CreateMovie([FromBody] Movie movie)
+        public async Task<IActionResult> CreateRoom([FromBody] Room room)
         {
             try
             {
-                if (movie == null)
+                if (room == null)
                 {
                     return BadRequest(new { message = "El cuerpo de la petición es requerido" });
                 }
 
-                if (string.IsNullOrWhiteSpace(movie.Title))
+                if (string.IsNullOrWhiteSpace(room.NumberOrName))
                 {
-                    return BadRequest(new { message = "El título es requerido" });
+                    return BadRequest(new { message = "El número o nombre de habitación es requerido" });
                 }
 
-                // TODO: Validar que el usuario es admin (requiere token parsing)
-                var adminId = "admin_123"; // Por ahora, hardcodeado
+                // Obtener el ID del gerente del token JWT
+                var managerId = User.FindFirst("sub")?.Value;
+                if (string.IsNullOrWhiteSpace(managerId))
+                {
+                    return Unauthorized(new { message = "No autenticado" });
+                }
 
-                var createdMovie = await _movieService.CreateMovie(movie, adminId);
+                var createdRoom = await _roomService.CreateRoom(room, managerId);
+                _logger.LogInformation($"Habitación creada: {createdRoom.NumberOrName}");
 
-                _logger.LogInformation($"Película creada: {createdMovie.Title}");
-
-                return Created($"/api/movie/{createdMovie.Id}", createdMovie);
+                return Created($"/api/rooms/{createdRoom.Id}", createdRoom);
             }
             catch (ArgumentException ex)
             {
@@ -170,54 +160,57 @@ public class MovieController : ControllerBase
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Error al crear película: {ex.Message}");
-                return StatusCode(500, new { message = "Error al crear película" });
+                _logger.LogError($"Error al crear habitación: {ex.Message}");
+                return StatusCode(500, new { message = "Error al crear habitación" });
             }
         }
 
         /// <summary>
-        /// PUT /api/movie/{movieId}
-        /// 
-        /// Edita una película existente (SOLO ADMIN)
-        /// 
+        /// PUT /api/rooms/{roomId}
+        ///
+        /// Edita una habitación existente (SOLO GERENTE)
+        ///
         /// Header requerido:
-        ///   Authorization: Bearer {token}
-        /// 
+        /// Authorization: Bearer {token}
+        ///
         /// Parámetro:
-        ///   movieId: ID de la película a editar
-        /// 
-        /// Cuerpo: Mismo formato que CreateMovie
-        /// 
-        /// Respuesta exitosa (200): La película actualizada
-        /// 
+        /// roomId: ID de la habitación a editar
+        ///
+        /// Cuerpo: Mismo formato que CreateRoom
+        ///
+        /// Respuesta exitosa (200): Habitación actualizada
+        ///
         /// Errores:
-        /// 404: Película no encontrada
+        /// 404: Habitación no encontrada
         /// 401: No autenticado
-        /// 403: No es administrador
+        /// 403: No es gerente
         /// </summary>
-        [HttpPut("{movieId}")]
-        public async Task<IActionResult> UpdateMovie(string movieId, [FromBody] Movie movie)
+        [Authorize(Roles = "Gerente")]
+        [HttpPut("{roomId}")]
+        public async Task<IActionResult> UpdateRoom(string roomId, [FromBody] Room room)
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(movieId))
+                if (string.IsNullOrWhiteSpace(roomId))
                 {
-                    return BadRequest(new { message = "El ID de película es requerido" });
+                    return BadRequest(new { message = "El ID de habitación es requerido" });
                 }
 
-                if (movie == null)
+                if (room == null)
                 {
                     return BadRequest(new { message = "El cuerpo de la petición es requerido" });
                 }
 
-                // TODO: Validar que el usuario es admin
-                var adminId = "admin_123"; // Por ahora, hardcodeado
+                var managerId = User.FindFirst("sub")?.Value;
+                if (string.IsNullOrWhiteSpace(managerId))
+                {
+                    return Unauthorized(new { message = "No autenticado" });
+                }
 
-                var updatedMovie = await _movieService.UpdateMovie(movieId, movie, adminId);
+                var updatedRoom = await _roomService.UpdateRoom(roomId, room, managerId);
+                _logger.LogInformation($"Habitación actualizada: {roomId}");
 
-                _logger.LogInformation($"Película actualizada: {movieId}");
-
-                return Ok(updatedMovie);
+                return Ok(updatedRoom);
             }
             catch (ArgumentException ex)
             {
@@ -229,48 +222,49 @@ public class MovieController : ControllerBase
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Error al actualizar película: {ex.Message}");
-                return StatusCode(500, new { message = "Error al actualizar película" });
+                _logger.LogError($"Error al actualizar habitación: {ex.Message}");
+                return StatusCode(500, new { message = "Error al actualizar habitación" });
             }
         }
 
         /// <summary>
-        /// DELETE /api/movie/{movieId}
-        /// 
-        /// Elimina una película (SOLO ADMIN)
-        /// 
+        /// DELETE /api/rooms/{roomId}
+        ///
+        /// Elimina una habitación (SOLO GERENTE)
+        /// Solo permite eliminar si no tiene reservas activas
+        ///
         /// Header requerido:
-        ///   Authorization: Bearer {token}
-        /// 
-        /// Parámetro:
-        ///   movieId: ID de la película a eliminar
-        /// 
+        /// Authorization: Bearer {token}
+        ///
         /// Respuesta exitosa (204): No content
-        /// 
+        ///
         /// Errores:
-        /// 404: Película no encontrada
-        /// 400: Película tiene calificaciones
+        /// 404: Habitación no encontrada
+        /// 400: Habitación tiene reservas
         /// 401: No autenticado
-        /// 403: No es administrador
+        /// 403: No es gerente
         /// </summary>
-        [HttpDelete("{movieId}")]
-        public async Task<IActionResult> DeleteMovie(string movieId)
+        [Authorize(Roles = "Gerente")]
+        [HttpDelete("{roomId}")]
+        public async Task<IActionResult> DeleteRoom(string roomId)
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(movieId))
+                if (string.IsNullOrWhiteSpace(roomId))
                 {
-                    return BadRequest(new { message = "El ID de película es requerido" });
+                    return BadRequest(new { message = "El ID de habitación es requerido" });
                 }
 
-                // TODO: Validar que el usuario es admin
-                var adminId = "admin_123"; // Por ahora, hardcodeado
+                var managerId = User.FindFirst("sub")?.Value;
+                if (string.IsNullOrWhiteSpace(managerId))
+                {
+                    return Unauthorized(new { message = "No autenticado" });
+                }
 
-                await _movieService.DeleteMovie(movieId, adminId);
+                await _roomService.DeleteRoom(roomId, managerId);
+                _logger.LogInformation($"Habitación eliminada: {roomId}");
 
-                _logger.LogInformation($"Película eliminada: {movieId}");
-
-                return NoContent(); // 204
+                return NoContent();
             }
             catch (InvalidOperationException ex)
             {
@@ -278,31 +272,23 @@ public class MovieController : ControllerBase
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Error al eliminar película: {ex.Message}");
-                return StatusCode(500, new { message = "Error al eliminar película" });
+                _logger.LogError($"Error al eliminar habitación: {ex.Message}");
+                return StatusCode(500, new { message = "Error al eliminar habitación" });
             }
         }
 
         /// <summary>
-        /// GET /api/movie/search/{searchTerm}
-        /// 
-        /// Busca películas por título
-        /// 
+        /// GET /api/rooms/search/{searchTerm}
+        ///
+        /// Busca habitaciones por número, nombre o tipo
+        ///
         /// Parámetro:
-        ///   searchTerm: Lo que el usuario busca
-        ///   Ejemplo: GET /api/movie/search/inception
-        /// 
-        /// Respuesta exitosa (200):
-        /// [
-        ///   {
-        ///     "id": "movie_001",
-        ///     "title": "Inception",
-        ///     ...
-        ///   }
-        /// ]
+        /// searchTerm: Término de búsqueda (ej: "Suite", "101", "Deluxe")
+        ///
+        /// Respuesta exitosa (200): Lista de habitaciones coincidentes
         /// </summary>
         [HttpGet("search/{searchTerm}")]
-        public async Task<IActionResult> SearchMovies(string searchTerm)
+        public async Task<IActionResult> SearchRooms(string searchTerm)
         {
             try
             {
@@ -311,13 +297,14 @@ public class MovieController : ControllerBase
                     return BadRequest(new { message = "El término de búsqueda es requerido" });
                 }
 
-                var results = await _movieService.SearchMovies(searchTerm);
+                var results = await _roomService.SearchRooms(searchTerm);
                 return Ok(results);
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Error al buscar películas: {ex.Message}");
-                return StatusCode(500, new { message = "Error al buscar películas" });
+                _logger.LogError($"Error al buscar habitaciones: {ex.Message}");
+                return StatusCode(500, new { message = "Error al buscar habitaciones" });
             }
         }
+    }
 }
