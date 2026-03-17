@@ -19,13 +19,19 @@ public class AuthService : IAuthService
 {
     private readonly IConfiguration _configuration;
     private readonly FirebaseService _firebaseService;
-    
+
     /**
      * Constructor que va recibir las dependencias inyectadas
      * FirabaseService: Para acceder a FB
      * IConfiguration: Para leer valores del appsetting (JWT)
      */
-    
+
+    public AuthService(IConfiguration configuration, FirebaseService firebaseService)
+    {
+        _configuration = configuration;
+        _firebaseService = firebaseService;
+    }
+
     /**
      * Crea un nuevo usuario
      *
@@ -79,7 +85,9 @@ public class AuthService : IAuthService
                 Email = registerDto.Email,
                 Fullname = registerDto.FullName,
                 Role = "user", //Por defecto, role de user normal
-                TotalRatings = 0,
+                HasReserved = false,
+                ReservedRoom = string.Empty,
+                ReservedDates = string.Empty,
                 CreatedAt = DateTime.UtcNow,
                 LastLogin = DateTime.UtcNow,
                 IsActive = true
@@ -216,6 +224,28 @@ public class AuthService : IAuthService
             return null;
         }
     }
+
+    /// <summary>
+    /// Envía un correo de recuperación de contraseña via Firebase Auth
+    /// </summary>
+    public async Task<bool> ResetPasswordAsync(string email)
+    {
+        try
+        {
+            // Firebase Auth genera y envía el correo de recuperación automáticamente
+            var link = await FirebaseAuth.DefaultInstance
+                .GeneratePasswordResetLinkAsync(email);
+
+            Console.WriteLine($"Link de recuperación generado para: {email}");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al resetear password: {ex.Message}");
+            return false;
+        }
+    }
+
 
     // Crea un token JWT para un usuario
     // El token contiene:

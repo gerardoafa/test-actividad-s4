@@ -33,7 +33,7 @@ public interface IAuthService
      *   Error interno de FB
      */
    
-    Task<User> Register(RegisterDto registerDto);
+    Task<User> Register(global::RegisterDto registerDto);
    
     /**
      *   Login:
@@ -62,5 +62,7 @@ public interface IAuthService
     Task<User?> GetUserById(string userId);
     
     string GenerateJwtToken(User user);
-    
+    //Envía correo de recuperación de contraseña
+    Task<bool> ResetPasswordAsync(string email);
+
 }
