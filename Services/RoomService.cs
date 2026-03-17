@@ -118,7 +118,7 @@ namespace ActividadS4.API.Services
                 room.CreatedAt = DateTime.UtcNow;
                 room.CreatedBy = managerId;
 
-                // Inicializar contadores de reseñas (si los usas)
+                // Inicializar contadores de reseñas
                 room.AverageRating = 0;
                 room.TotalRatings = 0;
 
@@ -212,7 +212,6 @@ namespace ActividadS4.API.Services
 
         /// <summary>
         /// DeleteRoom: Elimina una habitación (solo gerente)
-        /// Solo permite eliminar si no tiene reseñas o reservas (según tu lógica)
         /// </summary>
         public async Task DeleteRoom(string roomId, string managerId)
         {
@@ -225,7 +224,7 @@ namespace ActividadS4.API.Services
                 }
 
                 var roomsCollection = _firebaseService.GetCollection("rooms");
-                var ratingsCollection = _firebaseService.GetCollection("roomRatings");  // o "reservations" si prefieres bloquear por reservas
+                var ratingsCollection = _firebaseService.GetCollection("roomRatings");
 
                 // Verificar que la habitación existe
                 var roomDoc = await roomsCollection.Document(roomId).GetSnapshotAsync();
@@ -234,7 +233,7 @@ namespace ActividadS4.API.Services
                     throw new InvalidOperationException($"Habitación con ID {roomId} no existe");
                 }
 
-                // Verificar que no tiene reseñas (puedes cambiar a "reservations" si prefieres)
+                // Verificar que no tiene reseñas
                 var ratingsQuery = await ratingsCollection
                     .WhereEqualTo("RoomId", roomId)
                     .GetSnapshotAsync();
@@ -275,7 +274,7 @@ namespace ActividadS4.API.Services
                 // Obtener todas las habitaciones
                 var allRooms = await GetAllRooms();
 
-                // Filtrar por número/nombre o tipo que contiene el término
+                // Filtrar por número/nombre o tipo que contiene el término de búsqueda
                 var searchLower = searchTerm.ToLower();
                 var results = allRooms
                     .Where(r => r.NumberOrName.ToLower().Contains(searchLower) ||
