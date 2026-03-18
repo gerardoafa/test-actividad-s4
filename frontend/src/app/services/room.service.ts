@@ -14,6 +14,7 @@ export class RoomService {
 
   private getHeaders(): HttpHeaders {
     const token = this.authService.getToken();
+    console.log('Token:', token);
     return new HttpHeaders({
       'Content-Type': 'application/json',
       'Authorization': token ? `Bearer ${token}` : ''
@@ -22,15 +23,15 @@ export class RoomService {
 
   getAllRooms(type?: string): Observable<Room[]> {
     const url = type ? `${this.API_URL}?type=${type}` : this.API_URL;
-    return this.http.get<Room[]>(url);
+    return this.http.get<Room[]>(url, { headers: this.getHeaders() });
   }
 
   getRoomById(roomId: string): Observable<Room> {
-    return this.http.get<Room>(`${this.API_URL}/${roomId}`);
+    return this.http.get<Room>(`${this.API_URL}/${roomId}`, { headers: this.getHeaders() });
   }
 
   searchRooms(searchTerm: string): Observable<Room[]> {
-    return this.http.get<Room[]>(`${this.API_URL}/search/${searchTerm}`);
+    return this.http.get<Room[]>(`${this.API_URL}/search/${searchTerm}`, { headers: this.getHeaders() });
   }
 
   createRoom(room: Partial<Room>): Observable<Room> {

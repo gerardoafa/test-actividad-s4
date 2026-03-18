@@ -123,11 +123,13 @@ export class LoginComponent {
       next: (response) => {
         this.loading = false;
         if (response.success) {
-          if (response.user.role === 'gerente') {
+          if (response.user.role === 'gerente' || response.user.role === 'Gerente') {
             this.router.navigate(['/manager/dashboard']);
           } else {
             this.router.navigate(['/guest/dashboard']);
           }
+        } else {
+          this.error = response.message || 'Error al iniciar sesión';
         }
       },
       error: (err) => {

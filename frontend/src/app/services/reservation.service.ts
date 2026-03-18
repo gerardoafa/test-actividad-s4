@@ -31,4 +31,8 @@ export class ReservationService {
   getAllReservations(): Observable<Reservation[]> {
     return this.http.get<Reservation[]>(this.API_URL, { headers: this.getHeaders() });
   }
+
+  cancelReservation(reservationId: string): Observable<any> {
+    return this.http.delete(`${this.API_URL}/${reservationId}`, { headers: this.getHeaders() });
+  }
 }

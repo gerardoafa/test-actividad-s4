@@ -3,6 +3,7 @@ export interface ReservationStatistics {
   totalNightsReserved: number;
   occupancyPercentage: number;
   totalRevenue: number;
+  cancellationFees: number;
   reservationsByRoomType: { [key: string]: number };
   revenueByPeriod: { [key: string]: number };
 }

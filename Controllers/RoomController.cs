@@ -3,6 +3,7 @@ using ActividadS4.API.Models;
 using ActividadS4.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace ActividadS4.API.Controllers
 {
@@ -126,12 +127,17 @@ namespace ActividadS4.API.Controllers
         /// 401: No autenticado
         /// 403: No es gerente
         /// </summary>
-        [Authorize(Roles = "Gerente")]
+        [Authorize]
         [HttpPost]
         public async Task<IActionResult> CreateRoom([FromBody] Room room)
         {
             try
             {
+                Console.WriteLine($"CreateRoom called");
+                Console.WriteLine($"Raw JSON: {System.Text.Json.JsonSerializer.Serialize(room)}");
+                Console.WriteLine($"RoomNumber: '{room?.RoomNumber}', Type: '{room?.Type}', Capacity: {room?.Capacity}, BasePricePerNight: {room?.BasePricePerNight}");
+                Console.WriteLine($"All properties - Id: '{room?.Id}'");
+                
                 if (room == null)
                 {
                     return BadRequest(new { message = "El cuerpo de la petición es requerido" });
@@ -139,14 +145,17 @@ namespace ActividadS4.API.Controllers
 
                 if (string.IsNullOrWhiteSpace(room.RoomNumber))
                 {
-                    return BadRequest(new { message = "El número o nombre de habitación es requerido" });
+                    return BadRequest(new { message = "El número o nombre de habitación es requerido - received: " + room.RoomNumber });
                 }
 
-                // Obtener el ID del gerente del token JWT
-                var managerId = User.FindFirst("sub")?.Value;
+                var managerId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value 
+                    ?? User.FindFirst("sub")?.Value
+                    ?? User.FindFirst("userId")?.Value;
+                Console.WriteLine($"Manager ID: {managerId}");
+                
                 if (string.IsNullOrWhiteSpace(managerId))
                 {
-                    return Unauthorized(new { message = "No autenticado" });
+                    return Unauthorized(new { message = "No autenticado - no se encontró sub claim" });
                 }
 
                 var createdRoom = await _roomService.CreateRoom(room, managerId);
@@ -161,7 +170,7 @@ namespace ActividadS4.API.Controllers
             catch (Exception ex)
             {
                 _logger.LogError($"Error al crear habitación: {ex.Message}");
-                return StatusCode(500, new { message = "Error al crear habitación" });
+                return StatusCode(500, new { message = "Error al crear habitación: " + ex.Message });
             }
         }
 
@@ -185,7 +194,7 @@ namespace ActividadS4.API.Controllers
         /// 401: No autenticado
         /// 403: No es gerente
         /// </summary>
-        [Authorize(Roles = "Gerente")]
+        [Authorize]
         [HttpPut("{roomId}")]
         public async Task<IActionResult> UpdateRoom(string roomId, [FromBody] Room room)
         {
@@ -201,7 +210,9 @@ namespace ActividadS4.API.Controllers
                     return BadRequest(new { message = "El cuerpo de la petición es requerido" });
                 }
 
-                var managerId = User.FindFirst("sub")?.Value;
+                var managerId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value 
+                    ?? User.FindFirst("sub")?.Value
+                    ?? User.FindFirst("userId")?.Value;
                 if (string.IsNullOrWhiteSpace(managerId))
                 {
                     return Unauthorized(new { message = "No autenticado" });
@@ -244,7 +255,7 @@ namespace ActividadS4.API.Controllers
         /// 401: No autenticado
         /// 403: No es gerente
         /// </summary>
-        [Authorize(Roles = "Gerente")]
+        [Authorize]
         [HttpDelete("{roomId}")]
         public async Task<IActionResult> DeleteRoom(string roomId)
         {
@@ -255,7 +266,9 @@ namespace ActividadS4.API.Controllers
                     return BadRequest(new { message = "El ID de habitación es requerido" });
                 }
 
-                var managerId = User.FindFirst("sub")?.Value;
+                var managerId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value 
+                    ?? User.FindFirst("sub")?.Value
+                    ?? User.FindFirst("userId")?.Value;
                 if (string.IsNullOrWhiteSpace(managerId))
                 {
                     return Unauthorized(new { message = "No autenticado" });

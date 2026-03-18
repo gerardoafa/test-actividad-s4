@@ -24,5 +24,11 @@
         /// Obtiene la reserva de un huésped específico
         /// </summary>
         Task<Reservation?> GetReservationByUserIdAsync(string userId);
+
+        /// <summary>
+        /// Cancela la reserva de un huésped.
+        /// Aplica una tarifa de cancelación del 10%.
+        /// </summary>
+        Task CancelReservationAsync(string reservationId, string userId);
     }
 }

@@ -89,7 +89,7 @@ public class AuthService : IAuthService
                 {
                     throw new ArgumentException("Clave secreta incorrecta para crear usuario gerente");
                 }
-                role = "gerente";
+                role = "Gerente";
             }
 
             var newUser = new User
@@ -266,10 +266,10 @@ public class AuthService : IAuthService
             {
                 Subject = new ClaimsIdentity(new[]
                 {
-                    new Claim("sub", user.Id), // ID del usuario
-                    new Claim("email", user.Email), // Email
-                    new Claim("name", user.Fullname), // Nombre
-                    new Claim("role", user.Role) // Rol (user o admin)
+                    new Claim(ClaimTypes.NameIdentifier, user.Id),
+                    new Claim(ClaimTypes.Email, user.Email),
+                    new Claim(ClaimTypes.Name, user.Fullname),
+                    new Claim(ClaimTypes.Role, user.Role)
                 }),
                 Expires = DateTime.UtcNow.AddHours(24), // Válido por 24 horas
                 Issuer = issuer,

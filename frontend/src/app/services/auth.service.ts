@@ -16,8 +16,8 @@ export class AuthService {
 
   currentUser = computed(() => this.currentUserSignal());
   isLoggedIn = computed(() => !!this.currentUserSignal());
-  isManager = computed(() => this.currentUserSignal()?.role === 'gerente');
-  isGuest = computed(() => this.currentUserSignal()?.role === 'huesped' || this.currentUserSignal()?.role === 'user');
+  isManager = computed(() => this.currentUserSignal()?.role === 'Gerente');
+  isGuest = computed(() => this.currentUserSignal()?.role === 'huesped' || this.currentUserSignal()?.role === 'user' || this.currentUserSignal()?.role === 'Huésped');
 
   constructor(private http: HttpClient, private router: Router) {
     this.loadStoredUser();
@@ -52,6 +52,7 @@ export class AuthService {
   }
 
   private handleAuthSuccess(response: AuthResponse): void {
+    console.log('Saving token:', response.token);
     localStorage.setItem(this.TOKEN_KEY, response.token);
     localStorage.setItem(this.USER_KEY, JSON.stringify(response.user));
     this.currentUserSignal.set(response.user);

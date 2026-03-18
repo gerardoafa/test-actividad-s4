@@ -11,6 +11,9 @@ export interface Reservation {
   totalCost: number;
   status: string;
   timestamp: Date;
+  cancellationFee?: number;
+  refundAmount?: number;
+  cancelledAt?: Date;
 }
 
 export interface ReservationRequest {

@@ -21,7 +21,7 @@ import { ReservationStatistics } from '../../models/statistics.model';
 
       <nav class="nav-bar">
         <a routerLink="/manager/dashboard" class="nav-link active">Dashboard</a>
-        <a routerLink="/manager/rooms" class="nav-link">Habitaciones</a>
+        <a routerLink="/manager/rooms" class="nav-link" *ngIf="isManager">Habitaciones</a>
         <a routerLink="/manager/guests" class="nav-link">Huéspedes</a>
         <a routerLink="/manager/reports" class="nav-link">Reportes</a>
       </nav>
@@ -200,6 +200,7 @@ import { ReservationStatistics } from '../../models/statistics.model';
 })
 export class ManagerDashboardComponent implements OnInit {
   user = this.authService.getUser();
+  isManager = false;
   stats: ReservationStatistics | null = null;
   loading = true;
   reservationsByType: { [key: string]: number } = {};
@@ -209,7 +210,9 @@ export class ManagerDashboardComponent implements OnInit {
     private authService: AuthService,
     private reportService: ReportService,
     private router: Router
-  ) {}
+  ) {
+    this.isManager = this.authService.isManager();
+  }
 
   ngOnInit(): void {
     this.loadStatistics();

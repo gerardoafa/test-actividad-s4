@@ -1,4 +1,5 @@
-﻿namespace ActividadS4.API.Controllers
+﻿using System.Security.Claims;
+namespace ActividadS4.API.Controllers
 {
     using ActividadS4.API.DTOs;
     using ActividadS4.API.Services;
@@ -56,7 +57,7 @@
         /// 500: Error del servidor
         /// </summary>
         [HttpPost]
-        [Authorize(Roles = "huesped")]
+        [Authorize(Roles = "huesped,user,Huésped")]
         public async Task<IActionResult> CreateReservation([FromBody] ReservationDto reservationDto)
         {
             try
@@ -71,7 +72,9 @@
                     return BadRequest(new { message = "La fecha de salida debe ser posterior a la de entrada" });
 
                 // Obtener el ID del huésped desde el token JWT
-                var userId = User.FindFirst("sub")?.Value;
+                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value 
+                    ?? User.FindFirst("sub")?.Value
+                    ?? User.FindFirst("userId")?.Value;
 
                 if (string.IsNullOrWhiteSpace(userId))
                     return Unauthorized(new { message = "Token inválido" });
@@ -108,7 +111,7 @@
         /// 500: Error del servidor
         /// </summary>
         [HttpGet]
-        [Authorize(Roles = "gerente")]
+        [Authorize]
         public async Task<IActionResult> GetAllReservations()
         {
             try
@@ -135,12 +138,14 @@
         /// 500: Error del servidor
         /// </summary>
         [HttpGet("my-reservation")]
-        [Authorize(Roles = "user")]
+        [Authorize(Roles = "user,huesped,Huésped")]
         public async Task<IActionResult> GetMyReservation()
         {
             try
             {
-                var userId = User.FindFirst("sub")?.Value;
+                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value 
+                    ?? User.FindFirst("sub")?.Value
+                    ?? User.FindFirst("userId")?.Value;
 
                 if (string.IsNullOrWhiteSpace(userId))
                     return Unauthorized(new { message = "Token inválido" });
@@ -156,6 +161,59 @@
             {
                 _logger.LogError($"Error al obtener reserva del usuario: {ex.Message}");
                 return StatusCode(500, new { message = "Error al obtener reserva" });
+            }
+        }
+
+        /// <summary>
+        /// DELETE /api/reservations/{reservationId}
+        /// Cancela la reserva del huésped autenticado.
+        /// Aplica una tarifa de cancelación del 10%.
+        /// 
+        /// Respuesta exitosa (200): Reserva cancelada con detalles de reembolso
+        /// Errores:
+        /// 401: No autenticado
+        /// 403: No es el dueño de la reserva
+        /// 404: Reserva no encontrada
+        /// 400: Reserva ya cancelada
+        /// </summary>
+        [HttpDelete("{reservationId}")]
+        [Authorize(Roles = "huesped,user,Huésped")]
+        public async Task<IActionResult> CancelReservation(string reservationId)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(reservationId))
+                    return BadRequest(new { message = "El ID de reserva es requerido" });
+
+                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value 
+                    ?? User.FindFirst("sub")?.Value
+                    ?? User.FindFirst("userId")?.Value;
+
+                if (string.IsNullOrWhiteSpace(userId))
+                    return Unauthorized(new { message = "Token inválido" });
+
+                await _reservationService.CancelReservationAsync(reservationId, userId);
+                
+                _logger.LogInformation($"Reserva {reservationId} cancelada por usuario {userId}");
+
+                return Ok(new { 
+                    message = "Reserva cancelada exitosamente",
+                    cancellationFeePercentage = 10,
+                    messageDetail = "Se aplicó una tarifa de cancelación del 10%"
+                });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Forbid();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error al cancelar reserva: {ex.Message}");
+                return StatusCode(500, new { message = "Error al cancelar reserva" });
             }
         }
     }

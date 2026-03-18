@@ -26,8 +26,8 @@ import { Reservation } from '../../models/reservation.model';
           <p *ngIf="hasReservation">Ya tienes una reserva activa</p>
         </div>
 
-        <div *ngIf="hasReservation && reservation" class="reservation-card">
-          <h3>Tu Reserva</h3>
+        <div *ngIf="hasReservation && reservation" class="reservation-card" [class.cancelled]="reservation.status === 'cancelled'">
+          <h3>Tu Reserva <span class="status-badge" [class.confirmed]="reservation.status === 'confirmed'" [class.cancelled]="reservation.status === 'cancelled'">{{ reservation.status === 'cancelled' ? 'Cancelada' : 'Confirmada' }}</span></h3>
           <div class="reservation-details">
             <div class="detail">
               <label>Habitación:</label>
@@ -49,7 +49,22 @@ import { Reservation } from '../../models/reservation.model';
               <label>Total:</label>
               <span>\${{ reservation.totalCost | number:'1.2-2' }}</span>
             </div>
+            <div *ngIf="reservation.status === 'cancelled'" class="detail">
+              <label>Tarifa de Cancelación (10%):</label>
+              <span class="fee">\${{ reservation.cancellationFee | number:'1.2-2' }}</span>
+            </div>
+            <div *ngIf="reservation.status === 'cancelled'" class="detail">
+              <label>Reembolso:</label>
+              <span class="refund">\${{ reservation.refundAmount | number:'1.2-2' }}</span>
+            </div>
           </div>
+          <div *ngIf="reservation.status === 'confirmed'" class="cancellation-section">
+            <p class="cancellation-info">¿Deseas cancelar tu reserva? Se aplicará una tarifa del 10%.</p>
+            <button (click)="cancelReservation()" class="btn-cancel" [disabled]="cancelling">
+              {{ cancelling ? 'Cancelando...' : 'Cancelar Reserva' }}
+            </button>
+          </div>
+          <div *ngIf="cancelError" class="error">{{ cancelError }}</div>
         </div>
 
         <div class="actions">
@@ -162,12 +177,69 @@ import { Reservation } from '../../models/reservation.model';
     .btn-secondary:hover {
       background: #219a52;
     }
+    .reservation-card.cancelled {
+      border-left-color: #e74c3c;
+    }
+    .status-badge {
+      padding: 0.25rem 0.75rem;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      margin-left: 0.5rem;
+    }
+    .status-badge.confirmed {
+      background: #d4edda;
+      color: #155724;
+    }
+    .status-badge.cancelled {
+      background: #f8d7da;
+      color: #721c24;
+    }
+    .fee {
+      color: #e74c3c;
+    }
+    .refund {
+      color: #27ae60;
+      font-weight: bold;
+    }
+    .cancellation-section {
+      margin-top: 1.5rem;
+      padding-top: 1rem;
+      border-top: 1px solid #eee;
+    }
+    .cancellation-info {
+      color: #777;
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+    }
+    .btn-cancel {
+      padding: 0.75rem 1.5rem;
+      background: #e74c3c;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 0.95rem;
+    }
+    .btn-cancel:hover:not(:disabled) {
+      background: #c0392b;
+    }
+    .btn-cancel:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .error {
+      color: #e74c3c;
+      margin-top: 1rem;
+      text-align: center;
+    }
   `]
 })
 export class GuestDashboardComponent implements OnInit {
   user = this.authService.getUser();
   reservation: Reservation | null = null;
   hasReservation = false;
+  cancelling = false;
+  cancelError = '';
 
   constructor(
     private authService: AuthService,
@@ -187,6 +259,28 @@ export class GuestDashboardComponent implements OnInit {
       },
       error: () => {
         this.hasReservation = false;
+      }
+    });
+  }
+
+  cancelReservation(): void {
+    if (!this.reservation) return;
+    
+    if (!confirm('¿Estás seguro de cancelar tu reserva? Se aplicará una tarifa del 10%.')) {
+      return;
+    }
+
+    this.cancelling = true;
+    this.cancelError = '';
+
+    this.reservationService.cancelReservation(this.reservation.id).subscribe({
+      next: () => {
+        this.cancelling = false;
+        this.loadReservation();
+      },
+      error: (err) => {
+        this.cancelling = false;
+        this.cancelError = err.error?.message || 'Error al cancelar la reserva';
       }
     });
   }

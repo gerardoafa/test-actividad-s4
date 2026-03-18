@@ -13,7 +13,7 @@ namespace ActividadS4.API.Controllers
     /// </summary>
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize(Roles = "gerente")]
+    [Authorize]
     public class GuestsController : ControllerBase
     {
         private readonly IGuestService _guestService;

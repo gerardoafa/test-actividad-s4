@@ -45,13 +45,27 @@ namespace ActividadS4.API.Services
                 // Obtener snapshot (lectura de datos)
                 var snapshot = await query.GetSnapshotAsync();
 
+                // Si no hay documentos, devolver lista vacía
+                if (snapshot.Documents.Count == 0)
+                {
+                    return new List<RoomDto>();
+                }
+
                 // Convertir cada documento a RoomDto
                 var rooms = new List<RoomDto>();
                 foreach (var doc in snapshot.Documents)
                 {
-                    var roomDict = doc.ToDictionary();
-                    var room = ConvertDictToRoom(roomDict);
-                    rooms.Add(ConvertToDto(room));
+                    try
+                    {
+                        var roomDict = doc.ToDictionary();
+                        var room = ConvertDictToRoom(roomDict);
+                        rooms.Add(ConvertToDto(room));
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error al convertir documento {doc.Id}: {ex.Message}");
+                        continue;
+                    }
                 }
 
                 return rooms;
@@ -98,6 +112,8 @@ namespace ActividadS4.API.Services
         {
             try
             {
+                Console.WriteLine($"RoomService.CreateRoom - RoomNumber: '{room.RoomNumber}', Type: '{room.Type}', Capacity: {room.Capacity}");
+                
                 // Validar que los datos requeridos existen
                 if (string.IsNullOrWhiteSpace(room.RoomNumber))
                 {
@@ -121,6 +137,9 @@ namespace ActividadS4.API.Services
                 // Inicializar contadores de reseñas
                 room.AverageRating = 0;
                 room.TotalRatings = 0;
+                room.IsAvailable = true;
+                room.ReservationCount = 0;
+                room.BaseRate = room.BasePricePerNight; // Mantener BaseRate sincronizado
 
                 // Guardar en Firestore usando Dictionary
                 var roomData = new Dictionary<string, object>
@@ -131,8 +150,11 @@ namespace ActividadS4.API.Services
                     { "Capacity", room.Capacity },
                     { "Description", room.Description ?? "" },
                     { "BasePricePerNight", room.BasePricePerNight },
+                    { "BaseRate", room.BaseRate },
                     { "AverageRating", room.AverageRating },
                     { "TotalRatings", room.TotalRatings },
+                    { "IsAvailable", room.IsAvailable },
+                    { "ReservationCount", room.ReservationCount },
                     { "CreatedAt", room.CreatedAt },
                     { "CreatedBy", room.CreatedBy }
                 };
@@ -157,6 +179,9 @@ namespace ActividadS4.API.Services
         {
             try
             {
+                Console.WriteLine($"UpdateRoom called - roomId: {roomId}");
+                Console.WriteLine($"  room.RoomNumber: '{room.RoomNumber}', room.Type: '{room.Type}'");
+                
                 // Validar entrada
                 if (string.IsNullOrWhiteSpace(roomId))
                 {
@@ -175,13 +200,20 @@ namespace ActividadS4.API.Services
                 // Obtener la habitación existente para preservar campos de auditoría
                 var existingDict = existingDoc.ToDictionary();
                 var existingRoom = ConvertDictToRoom(existingDict);
+                
+                Console.WriteLine($"  existingRoom.RoomNumber: '{existingRoom.RoomNumber}', existingRoom.Type: '{existingRoom.Type}'");
 
                 // Actualizar solo los campos permitidos
-                existingRoom.RoomNumber = room.RoomNumber ?? existingRoom.RoomNumber;
-                existingRoom.Type = room.Type ?? existingRoom.Type;
+                existingRoom.RoomNumber = string.IsNullOrEmpty(room.RoomNumber) ? existingRoom.RoomNumber : room.RoomNumber;
+                existingRoom.Type = string.IsNullOrEmpty(room.Type) ? existingRoom.Type : room.Type;
                 existingRoom.Capacity = room.Capacity > 0 ? room.Capacity : existingRoom.Capacity;
-                existingRoom.Description = room.Description ?? existingRoom.Description;
+                existingRoom.Description = string.IsNullOrEmpty(room.Description) ? existingRoom.Description : room.Description;
                 existingRoom.BasePricePerNight = room.BasePricePerNight > 0 ? room.BasePricePerNight : existingRoom.BasePricePerNight;
+                existingRoom.BaseRate = existingRoom.BasePricePerNight; // Mantener sincronizado
+                existingRoom.IsAvailable = room.IsAvailable;
+                existingRoom.ReservationCount = room.ReservationCount > 0 ? room.ReservationCount : existingRoom.ReservationCount;
+                
+                Console.WriteLine($"  After update - RoomNumber: '{existingRoom.RoomNumber}', Type: '{existingRoom.Type}'");
 
                 // Guardar cambios usando Dictionary
                 var roomData = new Dictionary<string, object>
@@ -192,8 +224,11 @@ namespace ActividadS4.API.Services
                     { "Capacity", existingRoom.Capacity },
                     { "Description", existingRoom.Description },
                     { "BasePricePerNight", existingRoom.BasePricePerNight },
+                    { "BaseRate", existingRoom.BaseRate },
                     { "AverageRating", existingRoom.AverageRating },
                     { "TotalRatings", existingRoom.TotalRatings },
+                    { "IsAvailable", existingRoom.IsAvailable },
+                    { "ReservationCount", existingRoom.ReservationCount },
                     { "CreatedAt", existingRoom.CreatedAt },
                     { "CreatedBy", existingRoom.CreatedBy }
                 };
@@ -305,7 +340,9 @@ namespace ActividadS4.API.Services
                 Description = room.Description,
                 BasePricePerNight = room.BasePricePerNight,
                 AverageRating = room.AverageRating,
-                TotalRatings = room.TotalRatings
+                TotalRatings = room.TotalRatings,
+                IsAvailable = room.IsAvailable,
+                ReservationCount = room.ReservationCount
             };
         }
 
@@ -315,19 +352,30 @@ namespace ActividadS4.API.Services
         /// </summary>
         private Room ConvertDictToRoom(Dictionary<string, object> dict)
         {
-            return new Room
+            try
             {
-                Id = dict["Id"].ToString(),
-                RoomNumber = dict["NumberOrName"].ToString(),
-                Type = dict["Type"].ToString(),
-                Capacity = (int)(long)dict["Capacity"],
-                Description = dict["Description"].ToString(),
-                BasePricePerNight = Convert.ToDecimal(dict["BasePricePerNight"]),
-                AverageRating = Convert.ToDouble(dict["AverageRating"]),
-                TotalRatings = (int)(long)dict["TotalRatings"],
-                CreatedAt = ((Timestamp)dict["CreatedAt"]).ToDateTime(),
-                CreatedBy = dict["CreatedBy"].ToString()
-            };
+                return new Room
+                {
+                    Id = dict.ContainsKey("Id") ? dict["Id"]?.ToString() ?? "" : "",
+                    RoomNumber = dict.ContainsKey("NumberOrName") ? dict["NumberOrName"]?.ToString() ?? "" : "",
+                    Type = dict.ContainsKey("Type") ? dict["Type"]?.ToString() ?? "" : "",
+                    Capacity = dict.ContainsKey("Capacity") ? (int)(long)dict["Capacity"] : 0,
+                    Description = dict.ContainsKey("Description") ? dict["Description"]?.ToString() ?? "" : "",
+                    BasePricePerNight = dict.ContainsKey("BasePricePerNight") ? Convert.ToDouble(dict["BasePricePerNight"]) : 0,
+                    BaseRate = dict.ContainsKey("BaseRate") ? Convert.ToDouble(dict["BaseRate"]) : 0,
+                    AverageRating = dict.ContainsKey("AverageRating") ? Convert.ToDouble(dict["AverageRating"]) : 0,
+                    TotalRatings = dict.ContainsKey("TotalRatings") ? (int)(long)dict["TotalRatings"] : 0,
+                    IsAvailable = dict.ContainsKey("IsAvailable") ? Convert.ToBoolean(dict["IsAvailable"]) : true,
+                    ReservationCount = dict.ContainsKey("ReservationCount") ? (int)(long)dict["ReservationCount"] : 0,
+                    CreatedAt = dict.ContainsKey("CreatedAt") && dict["CreatedAt"] != null ? ((Timestamp)dict["CreatedAt"]).ToDateTime() : DateTime.UtcNow,
+                    CreatedBy = dict.ContainsKey("CreatedBy") ? dict["CreatedBy"]?.ToString() ?? "" : ""
+                };
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error al convertir habitación: {ex.Message}");
+                return new Room();
+            }
         }
     }
 }

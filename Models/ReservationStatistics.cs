@@ -24,7 +24,12 @@
         /// <summary>
         /// Ingresos totales generados por todas las reservas confirmadas
         /// </summary>
-        public decimal TotalRevenue { get; set; }
+        public double TotalRevenue { get; set; }
+
+        /// <summary>
+        /// Total de tarifas de cancelación cobradas
+        /// </summary>
+        public double CancellationFees { get; set; }
 
         /// <summary>
         /// Número de reservas agrupadas por tipo de habitación.
@@ -38,6 +43,6 @@
         /// Usado para el gráfico de tendencia temporal del dashboard.
         /// Ejemplo: { "Enero 2026": 15000.00, "Febrero 2026": 18500.00 }
         /// </summary>
-        public Dictionary<string, decimal> RevenueByPeriod { get; set; } = new();
+        public Dictionary<string, double> RevenueByPeriod { get; set; } = new();
     }
 }

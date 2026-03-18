@@ -13,7 +13,8 @@
         private readonly ILogger<ReservationService> _logger;
 
         // Impuesto aplicado al costo total de la reserva (15%)
-        private const decimal TAX_RATE = 0.15m;
+        private const double TAX_RATE = 0.15;
+        private const double CANCELLATION_FEE_PERCENTAGE = 0.10; // 10% tariff
 
         /// <summary>Constructor que recibe las dependencias inyectadas</summary>
         public ReservationService(FirebaseService firebaseService, ILogger<ReservationService> logger)
@@ -65,7 +66,8 @@
 
                 // Paso 4: Calcular noches y costo total con impuestos
                 var nights = (int)(dto.CheckOutDate - dto.CheckInDate).TotalDays;
-                var subtotal = room.BaseRate * nights;
+                var pricePerNight = room.BaseRate > 0 ? room.BaseRate : room.BasePricePerNight;
+                var subtotal = pricePerNight * nights;
                 var totalCost = subtotal * (1 + TAX_RATE); // Precio + 15% impuesto
 
                 // Paso 5: Crear la reserva
@@ -151,12 +153,99 @@
                 if (snapshot.Count == 0)
                     return null;
 
-                return snapshot.Documents[0].ConvertTo<Reservation>();
+                var reservations = snapshot.Documents
+                    .Select(doc => doc.ConvertTo<Reservation>())
+                    .ToList();
+
+                // Primero buscar reserva confirmada
+                var confirmedReservation = reservations.FirstOrDefault(r => r.Status == "confirmed");
+                if (confirmedReservation != null)
+                    return confirmedReservation;
+
+                // Si no hay confirmada, retornar la cancelada más reciente
+                return reservations.OrderByDescending(r => r.Timestamp).FirstOrDefault();
             }
             catch (Exception ex)
             {
                 _logger.LogError($"Error al obtener reserva del usuario {userId}: {ex.Message}");
                 return null;
+            }
+        }
+
+        /// <summary>
+        /// Cancela la reserva de un huésped.
+        /// Aplica una tarifa de cancelación del 10%.
+        /// </summary>
+        public async Task CancelReservationAsync(string reservationId, string userId)
+        {
+            try
+            {
+                var reservationsCollection = _firebaseService.GetCollection("reservations");
+                var usersCollection = _firebaseService.GetCollection("users");
+                var roomsCollection = _firebaseService.GetCollection("rooms");
+
+                // Obtener la reserva
+                var reservationDoc = await reservationsCollection.Document(reservationId).GetSnapshotAsync();
+                if (!reservationDoc.Exists)
+                    throw new InvalidOperationException("Reserva no encontrada");
+
+                var reservation = reservationDoc.ConvertTo<Reservation>();
+
+                // Verificar que la reserva pertenece al usuario
+                if (reservation.UserId != userId)
+                    throw new UnauthorizedAccessException("No tienes permiso para cancelar esta reserva");
+
+                // Verificar que no está cancelada ya
+                if (reservation.Status == "cancelled")
+                    throw new InvalidOperationException("Esta reserva ya fue cancelada");
+
+                // Calcular tarifa de cancelación (10% del total)
+                var cancellationFee = reservation.TotalCost * CANCELLATION_FEE_PERCENTAGE;
+                var refundAmount = reservation.TotalCost - cancellationFee;
+
+                _logger.LogInformation($"Cancelando reserva {reservationId}. Tarifa: {cancellationFee}, Reembolso: {refundAmount}");
+
+                // Actualizar la reserva a cancelada
+                await reservationsCollection.Document(reservationId).UpdateAsync(
+                    new Dictionary<string, object>
+                    {
+                        { "Status", "cancelled" },
+                        { "CancellationFee", cancellationFee },
+                        { "RefundAmount", refundAmount },
+                        { "CancelledAt", DateTime.UtcNow }
+                    });
+
+                // Liberar al usuario para que pueda reservar de nuevo
+                await usersCollection.Document(userId).UpdateAsync(
+                    new Dictionary<string, object>
+                    {
+                        { "HasReserved", false },
+                        { "ReservedRoom", "" },
+                        { "ReservedDates", "" },
+                        { "ReservationTimestamp", null }
+                    });
+
+                // Decrementar el contador de reservas de la habitación
+                var roomDoc = await roomsCollection.Document(reservation.RoomId).GetSnapshotAsync();
+                if (roomDoc.Exists)
+                {
+                    var room = roomDoc.ConvertTo<Room>();
+                    if (room.ReservationCount > 0)
+                    {
+                        await roomsCollection.Document(reservation.RoomId).UpdateAsync(
+                            new Dictionary<string, object>
+                            {
+                                { "ReservationCount", room.ReservationCount - 1 }
+                            });
+                    }
+                }
+
+                _logger.LogInformation($"Reserva {reservationId} cancelada por usuario {userId}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error al cancelar reserva: {ex.Message}");
+                throw;
             }
         }
     }

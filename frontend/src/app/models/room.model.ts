@@ -5,6 +5,7 @@ export interface Room {
   capacity: number;
   description: string;
   basePricePerNight: number;
+  baseRate: number;
   averageRating: number;
   totalRatings: number;
   isAvailable: boolean;

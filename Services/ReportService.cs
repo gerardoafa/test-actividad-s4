@@ -53,23 +53,31 @@ namespace ActividadS4.API.Services
                     .Select(doc => doc.ConvertTo<Reservation>())
                     .ToList();
 
-                // Calcular habitaciones con al menos una reserva
-                var reservedRoomIds = reservations.Select(r => r.RoomId).Distinct().ToList();
+                // Filtrar solo reservas confirmadas (excluir canceladas)
+                var confirmedReservations = reservations
+                    .Where(r => r.Status == "confirmed")
+                    .ToList();
 
-                // Calcular estadísticas
-                var totalNights = reservations.Sum(r => r.Nights);
-                var totalRevenue = reservations.Sum(r => r.TotalCost);
+                // Obtener tarifas de cancelación de reservas canceladas (ingreso para el hotel)
+                var cancelledReservations = reservations
+                    .Where(r => r.Status == "cancelled" && r.CancellationFee > 0)
+                    .ToList();
+                var cancellationFees = cancelledReservations.Sum(r => r.CancellationFee);
+
+                // Calcular estadísticas solo con reservas confirmadas
+                var totalNights = confirmedReservations.Sum(r => r.Nights);
+                var totalRevenue = confirmedReservations.Sum(r => r.TotalCost) + cancellationFees;
                 var occupancyPercentage = rooms.Count > 0
-                    ? (double)reservedRoomIds.Count / rooms.Count * 100
+                    ? (double)confirmedReservations.Select(r => r.RoomId).Distinct().Count() / rooms.Count * 100
                     : 0;
 
                 // Agrupar reservas por tipo de habitación (para gráfico de barras)
-                var byRoomType = reservations
+                var byRoomType = confirmedReservations
                     .GroupBy(r => r.RoomType)
                     .ToDictionary(g => g.Key, g => g.Count());
 
                 // Agrupar ingresos por mes (para gráfico de tendencia temporal)
-                var byPeriod = reservations
+                var byPeriod = confirmedReservations
                     .GroupBy(r => r.Timestamp.ToString("MMMM yyyy"))
                     .ToDictionary(g => g.Key, g => g.Sum(r => r.TotalCost));
 
@@ -79,6 +87,7 @@ namespace ActividadS4.API.Services
                     TotalNightsReserved = totalNights,
                     OccupancyPercentage = Math.Round(occupancyPercentage, 2),
                     TotalRevenue = totalRevenue,
+                    CancellationFees = cancellationFees,
                     ReservationsByRoomType = byRoomType,
                     RevenueByPeriod = byPeriod
                 };

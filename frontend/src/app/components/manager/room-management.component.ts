@@ -26,7 +26,7 @@ import { AuthService } from '../../services/auth.service';
 
       <div class="content">
         <div class="actions-bar">
-          <button (click)="showForm = true" class="btn-add">+ Nueva Habitación</button>
+          <button (click)="newRoom()" class="btn-add">+ Nueva Habitación</button>
         </div>
 
         <div *ngIf="showForm" class="form-card">
@@ -323,6 +323,19 @@ export class RoomManagementComponent implements OnInit {
     });
   }
 
+  newRoom(): void {
+    this.editingRoom = null;
+    this.roomForm = {
+      roomNumber: '',
+      type: '',
+      capacity: 1,
+      basePricePerNight: 0,
+      description: '',
+      isAvailable: true
+    };
+    this.showForm = true;
+  }
+
   editRoom(room: Room): void {
     this.editingRoom = room;
     this.roomForm = { ...room };
@@ -341,19 +354,25 @@ export class RoomManagementComponent implements OnInit {
       : this.roomService.createRoom(data);
 
     request.subscribe({
-      next: () => {
+      next: (result) => {
         this.saving = false;
         this.cancelForm();
         this.loadRooms();
       },
-      error: () => {
+      error: (err) => {
+        console.error('Error saving room:', err);
         this.saving = false;
+        alert('Error al guardar habitación: ' + (err.error?.message || err.message));
       }
     });
   }
 
   toggleAvailability(room: Room): void {
-    this.roomService.updateRoom(room.id, { isAvailable: !room.isAvailable }).subscribe({
+    const updatedRoom = { 
+      ...room, 
+      isAvailable: !room.isAvailable 
+    };
+    this.roomService.updateRoom(room.id, updatedRoom).subscribe({
       next: () => this.loadRooms()
     });
   }

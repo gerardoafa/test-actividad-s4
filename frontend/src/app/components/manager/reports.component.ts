@@ -49,6 +49,10 @@ Chart.register(...registerables);
                 <span class="stat-label">Ingresos Totales:</span>
                 <span class="stat-value">\${{ stats.totalRevenue | number:'1.2-2' }}</span>
               </div>
+              <div class="stat-item">
+                <span class="stat-label">Tarifas de Cancelación:</span>
+                <span class="stat-value fee">\${{ stats.cancellationFees | number:'1.2-2' }}</span>
+              </div>
             </div>
           </div>
 
@@ -157,6 +161,9 @@ Chart.register(...registerables);
       font-weight: bold;
       color: #333;
     }
+    .stat-value.fee {
+      color: #e74c3c;
+    }
     .chart-container {
       position: relative;
       height: 300px;
@@ -210,6 +217,7 @@ export class ReportsComponent implements OnInit, AfterViewInit {
 
     if (this.reservationsChartRef?.nativeElement) {
       const reservationsData = this.stats.reservationsByRoomType;
+      
       this.reservationsChart = new Chart(this.reservationsChartRef.nativeElement, {
         type: 'doughnut',
         data: {
@@ -228,15 +236,29 @@ export class ReportsComponent implements OnInit, AfterViewInit {
 
     if (this.revenueChartRef?.nativeElement) {
       const revenueData = this.stats.revenueByPeriod;
+      const labels = Object.keys(revenueData);
+      const data = Object.values(revenueData);
+      
+      // Agregar barras de tarifas de cancelación si hay
+      const datasets = [{
+        label: 'Reservas',
+        data: data,
+        backgroundColor: '#667eea'
+      }];
+      
+      if (this.stats.cancellationFees > 0) {
+        datasets.push({
+          label: 'Tarifas de Cancelación',
+          data: labels.map(() => this.stats!.cancellationFees),
+          backgroundColor: '#e74c3c'
+        });
+      }
+      
       this.revenueChart = new Chart(this.revenueChartRef.nativeElement, {
         type: 'bar',
         data: {
-          labels: Object.keys(revenueData),
-          datasets: [{
-            label: 'Ingresos',
-            data: Object.values(revenueData),
-            backgroundColor: '#667eea'
-          }]
+          labels: labels,
+          datasets: datasets
         },
         options: {
           responsive: true,
