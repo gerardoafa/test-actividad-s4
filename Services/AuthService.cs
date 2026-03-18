@@ -79,12 +79,25 @@ public class AuthService : IAuthService
              // Crear el usuario nuevo
              // El ID se genera autimaticamente por FB
 
+            string role = "user";
+            
+            // Si solicita rol de gerente, verificar la clave secreta
+            if (registerDto.Role == "gerente")
+            {
+                var validSecret = _configuration["AdminSecretKey"] ?? "admin123";
+                if (registerDto.SecretKey != validSecret)
+                {
+                    throw new ArgumentException("Clave secreta incorrecta para crear usuario gerente");
+                }
+                role = "Gerente";
+            }
+
             var newUser = new User
             {
                 Id = Guid.NewGuid().ToString(), //Generar el id unico
                 Email = registerDto.Email,
                 Fullname = registerDto.FullName,
-                Role = "user", //Por defecto, role de user normal
+                Role = role, //Por defecto, role de user normal
                 TotalRatings = 0,
                 CreatedAt = DateTime.UtcNow,
                 LastLogin = DateTime.UtcNow,
@@ -253,10 +266,10 @@ public class AuthService : IAuthService
             {
                 Subject = new ClaimsIdentity(new[]
                 {
-                    new Claim("sub", user.Id), // ID del usuario
-                    new Claim("email", user.Email), // Email
-                    new Claim("name", user.Fullname), // Nombre
-                    new Claim("role", user.Role) // Rol (user o admin)
+                    new Claim(ClaimTypes.NameIdentifier, user.Id),
+                    new Claim(ClaimTypes.Email, user.Email),
+                    new Claim(ClaimTypes.Name, user.Fullname),
+                    new Claim(ClaimTypes.Role, user.Role)
                 }),
                 Expires = DateTime.UtcNow.AddHours(24), // Válido por 24 horas
                 Issuer = issuer,

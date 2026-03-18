@@ -46,13 +46,25 @@ public class Reservation
 
     [FirestoreProperty]
     //Costo total de la reserva incluyendo impuestos (Noches × TarifaBase × 1.15
-    public decimal TotalCost { get; set; }
+    public double TotalCost { get; set; }
 
     [FirestoreProperty]
-    //Estado de la reserva: confirmed o pending
+    //Estado de la reserva: confirmed o cancelled
     public string Status { get; set; } = "confirmed";
 
     [FirestoreProperty]
     //Fecha y hora exacta en que se creó la reserva
     public DateTime Timestamp { get; set; }
+
+    [FirestoreProperty]
+    //Tarifa de cancelación aplicada (10% del total)
+    public double CancellationFee { get; set; }
+
+    [FirestoreProperty]
+    //Monto a reembolsar al cliente después de la tarifa
+    public double RefundAmount { get; set; }
+
+    [FirestoreProperty]
+    //Fecha y hora de la cancelación
+    public DateTime? CancelledAt { get; set; }
 }

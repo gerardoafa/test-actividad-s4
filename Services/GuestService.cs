@@ -29,16 +29,17 @@ namespace ActividadS4.API.Services
             {
                 var collection = _firebaseService.GetCollection("users");
 
-                // Filtrar solo usuarios con rol "huesped"
-                var snapshot = await collection
-                    .WhereEqualTo("Role", "huesped")
-                    .GetSnapshotAsync();
+                // Obtener todos los usuarios y filtrar los que no son gerentes
+                var snapshot = await collection.GetSnapshotAsync();
 
                 // Convertir cada documento a UserDto (sin datos sensibles)
                 return snapshot.Documents
                     .Select(doc =>
                     {
                         var user = doc.ConvertTo<User>();
+                        // Filtrar solo huéspedes (no gerentes)
+                        if (user.Role == "Gerente" || user.Role == "gerente")
+                            return null;
                         return new UserDto
                         {
                             Id = user.Id,
@@ -51,6 +52,8 @@ namespace ActividadS4.API.Services
                             ReservedDates = user.ReservedDates
                         };
                     })
+                    .Where(dto => dto != null)
+                    .Cast<UserDto>()
                     .ToList();
             }
             catch (Exception ex)

@@ -1,4 +1,5 @@
 using Google.Cloud.Firestore;
+using System.Text.Json.Serialization;
 
 namespace ActividadS4.API.Models;
 
@@ -10,50 +11,33 @@ namespace ActividadS4.API.Models;
 [FirestoreData]
 public class Room
 {
-    /** 
-     * Id: Identificador único de la habitación
-     * En Firestore, es el ID del documento (autogenerado o GUID)
-     * Ejemplo: room_abc123, room_001, etc.
-     */
+    [JsonPropertyName("id")]
     [FirestoreProperty]
     public string Id { get; set; } = string.Empty;
 
-    /**
-     * NumberOrName: Número o nombre visible de la habitación
-     * Lo que ven los huéspedes y gerentes (ej: "101", "Suite Luna", "Bungalow 12")
-     */
-    [FirestoreProperty]
+    [JsonPropertyName("roomNumber")]
+    [FirestoreProperty(Name = "NumberOrName")]
     public string RoomNumber { get; set; } = string.Empty;
 
-    /**
-     * Type: Tipo o categoría de la habitación
-     * Ejemplos: "Estándar", "Junior Suite", "Suite Deluxe", "Familiar", "Con vista al mar"
-     */
+    [JsonPropertyName("type")]
     [FirestoreProperty]
     public string Type { get; set; } = string.Empty;
 
-    /**
-     * Capacity: Capacidad máxima de personas
-     * Número total (adultos + niños según reglas del hotel)
-     * Ejemplo: 2, 4, 6
-     */
+    [JsonPropertyName("capacity")]
     [FirestoreProperty]
     public int Capacity { get; set; }
 
-    /**
-     * Description: Descripción detallada de la habitación
-     * Características, ambiente, servicios incluidos, etc.
-     */
+    [JsonPropertyName("description")]
     [FirestoreProperty]
     public string Description { get; set; } = string.Empty;
 
-    /**
-     * BasePricePerNight: Tarifa base por noche
-     * Precio sin impuestos, promociones ni ajustes por temporada
-     * Se usa para cálculos iniciales y mostrar al huésped
-     */
+    [JsonPropertyName("basePricePerNight")]
     [FirestoreProperty]
-    public decimal BasePricePerNight { get; set; }
+    public double BasePricePerNight { get; set; }
+
+    [JsonPropertyName("baseRate")]
+    [FirestoreProperty]
+    public double BaseRate { get; set; }
 
     /**
      * AverageRating: Calificación promedio de huéspedes
@@ -80,12 +64,8 @@ public class Room
     [FirestoreProperty]
     public int ReservationCount { get; set; }
     //Aqui se indica si la habitacion esta disponible para hacer nuevas reservas
-
-    //Precio base por noche 
-
     [FirestoreProperty]
-    public decimal BaseRate { get; set; }
-    [FirestoreProperty]
+    [JsonPropertyName("isAvailable")]
     public bool IsAvailable { get; set; } = true;
     [FirestoreProperty]
     public DateTime CreatedAt { get; set; }

@@ -71,6 +71,17 @@ public class RegisterDto
      * FullName nombre que aparecera en el perfil
      */
     public string FullName { get; set; } = string.Empty;
+
+    /**
+     * Role: Rol del usuario (user o gerente). 
+     * Para registrarte como gerente necesitas la clave secreta.
+     */
+    public string? Role { get; set; }
+
+    /**
+     * SecretKey: Clave secreta para registrarte como gerente
+     */
+    public string? SecretKey { get; set; }
 }
 
 public class LoginDto

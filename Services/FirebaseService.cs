@@ -156,13 +156,6 @@ public class FirebaseService
 
     public CollectionReference GetCollection(string collectionName)
     {
-        /*
-         * Devolvemos una referencia a la coleccion
-         * GetCollectionReference: no descarga, apunta a los datos
-         * Es como un apuntador a la coleccion
-         * 
-         */
-        return _firestoreDb.Collection("collectionName");
-
+        return _firestoreDb.Collection(collectionName);
     }
 }

@@ -11,7 +11,7 @@
     /// </summary>
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize(Roles = "gerente")]
+    [Authorize]
     public class ReportsController : ControllerBase
     {
         private readonly IReportService _reportService;

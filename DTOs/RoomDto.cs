@@ -20,6 +20,11 @@ public class RoomDto
     public string NumberOrName { get; set; } = string.Empty;
 
     /// <summary>
+    /// Alias para compatibilidad con frontend
+    /// </summary>
+    public string RoomNumber { get => NumberOrName; set => NumberOrName = value; }
+
+    /// <summary>
     /// Tipo o categoría de la habitación.
     /// Ejemplos: "Estándar", "Junior Suite", "Suite Deluxe", "Familiar", "Con vista al mar".
     /// Útil para filtros y agrupaciones.
@@ -43,7 +48,7 @@ public class RoomDto
     /// Tarifa base por noche (sin impuestos ni promociones).
     /// El frontend puede usarla para mostrar precio inicial o calcular total aproximado.
     /// </summary>
-    public decimal BasePricePerNight { get; set; }
+    public double BasePricePerNight { get; set; }
 
     /// <summary>
     /// Calificación promedio de huéspedes (ej: 4.7 de 5).
@@ -56,4 +61,14 @@ public class RoomDto
     /// Útil para mostrar contexto: "4.8 ★ (basado en 142 opiniones)".
     /// </summary>
     public int TotalRatings { get; set; }
+
+    /// <summary>
+    /// Indica si la habitación está disponible para reservas
+    /// </summary>
+    public bool IsAvailable { get; set; } = true;
+
+    /// <summary>
+    /// Número de reservas de esta habitación
+    /// </summary>
+    public int ReservationCount { get; set; }
 }
