@@ -2,9 +2,21 @@
 using FirebaseAdmin;
 using Google.Apis.Auth.OAuth2;
 using Google.Cloud.Firestore.V1;
+using Google.Cloud.Storage.V1;
 using Grpc.Auth;
 using Newtonsoft.Json;
+
 namespace ActividadS4.API.Services;
+
+public class DocumentInfo
+{
+    public string Id { get; set; } = string.Empty;
+    public string FileName { get; set; } = string.Empty;
+    public string FileUrl { get; set; } = string.Empty;
+    public DateTime UploadDate { get; set; }
+    public long FileSize { get; set; }
+    public string UserId { get; set; } = string.Empty;
+}
 
 public class FirebaseService
 {
@@ -162,7 +174,103 @@ public class FirebaseService
          * Es como un apuntador a la coleccion
          * 
          */
-        return _firestoreDb.Collection("collectionName");
+        return _firestoreDb.Collection(collectionName);
 
+    }
+
+    public async Task<DocumentInfo> UploadDocumentAsync(IFormFile file, string userId)
+    {
+        var bucketName = "proyectofinal-4e3b0.appspot.com";
+        var credentialsPath = Path.Combine(AppContext.BaseDirectory, "Config", "firebase-credentials.json");
+        
+        var storage = await StorageClient.CreateAsync();
+        var objectName = $"documents/{userId}/{Guid.NewGuid()}_{file.FileName}";
+        
+        using var memoryStream = new MemoryStream();
+        await file.CopyToAsync(memoryStream);
+        memoryStream.Position = 0;
+        
+        var storageObject = await storage.UploadObjectAsync(
+            bucketName,
+            objectName,
+            file.ContentType,
+            memoryStream
+        );
+        
+        var document = new DocumentInfo
+        {
+            Id = Guid.NewGuid().ToString(),
+            FileName = file.FileName,
+            FileUrl = $"https://storage.googleapis.com/{bucketName}/{objectName}",
+            UploadDate = DateTime.UtcNow,
+            FileSize = file.Length,
+            UserId = userId
+        };
+        
+        var documentsRef = _firestoreDb.Collection("documents");
+        await documentsRef.Document(document.Id).SetAsync(document);
+        
+        return document;
+    }
+
+    public async Task<List<DocumentInfo>> GetDocumentsAsync(string userId)
+    {
+        var documentsRef = _firestoreDb.Collection("documents")
+            .WhereEqualTo("UserId", userId);
+        
+        var snapshot = await documentsRef.GetSnapshotAsync();
+        var documents = new List<DocumentInfo>();
+        
+        foreach (var doc in snapshot.Documents)
+        {
+            documents.Add(doc.ConvertTo<DocumentInfo>());
+        }
+        
+        return documents;
+    }
+
+    public async Task<DocumentInfo?> GetDocumentAsync(string documentId)
+    {
+        var docRef = _firestoreDb.Collection("documents").Document(documentId);
+        var snapshot = await docRef.GetSnapshotAsync();
+        
+        if (!snapshot.Exists)
+            return null;
+        
+        return snapshot.ConvertTo<DocumentInfo>();
+    }
+
+    public async Task<(byte[]? FileBytes, string FileName)?> DownloadDocumentAsync(string documentId)
+    {
+        var document = await GetDocumentAsync(documentId);
+        if (document == null)
+            return null;
+        
+        var bucketName = "proyectofinal-4e3b0.appspot.com";
+        var objectName = document.FileUrl.Replace($"https://storage.googleapis.com/{bucketName}/", "");
+        
+        var storage = await StorageClient.CreateAsync();
+        var storageObject = await storage.GetObjectAsync(bucketName, objectName);
+        
+        using var memoryStream = new MemoryStream();
+        await storage.DownloadObjectAsync(bucketName, objectName, memoryStream);
+        
+        return (memoryStream.ToArray(), document.FileName);
+    }
+
+    public async Task DeleteDocumentAsync(string documentId, string userId)
+    {
+        var document = await GetDocumentAsync(documentId);
+        if (document == null || document.UserId != userId)
+            throw new InvalidOperationException("Documento no encontrado o no autorizado");
+        
+        var bucketName = "proyectofinal-4e3b0.appspot.com";
+        var objectName = document.FileUrl.Replace($"https://storage.googleapis.com/{bucketName}/", "");
+        
+        var storage = await StorageClient.CreateAsync();
+        await storage.DeleteObjectAsync(bucketName, objectName);
+        
+        var docRef = _firestoreDb.Collection("documents").Document(documentId);
+        await docRef.DeleteAsync();
     }
 }
