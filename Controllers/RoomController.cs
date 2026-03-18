@@ -137,7 +137,7 @@ namespace ActividadS4.API.Controllers
                     return BadRequest(new { message = "El cuerpo de la petición es requerido" });
                 }
 
-                if (string.IsNullOrWhiteSpace(room.NumberOrName))
+                if (string.IsNullOrWhiteSpace(room.RoomNumber))
                 {
                     return BadRequest(new { message = "El número o nombre de habitación es requerido" });
                 }
@@ -150,7 +150,7 @@ namespace ActividadS4.API.Controllers
                 }
 
                 var createdRoom = await _roomService.CreateRoom(room, managerId);
-                _logger.LogInformation($"Habitación creada: {createdRoom.NumberOrName}");
+                _logger.LogInformation($"Habitación creada: {createdRoom.RoomNumber}");
 
                 return Created($"/api/rooms/{createdRoom.Id}", createdRoom);
             }

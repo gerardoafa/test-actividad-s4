@@ -19,13 +19,19 @@ public class AuthService : IAuthService
 {
     private readonly IConfiguration _configuration;
     private readonly FirebaseService _firebaseService;
-    
+
     /**
      * Constructor que va recibir las dependencias inyectadas
      * FirabaseService: Para acceder a FB
      * IConfiguration: Para leer valores del appsetting (JWT)
      */
-    
+
+    public AuthService(IConfiguration configuration, FirebaseService firebaseService)
+    {
+        _configuration = configuration;
+        _firebaseService = firebaseService;
+    }
+
     /**
      * Crea un nuevo usuario
      *
