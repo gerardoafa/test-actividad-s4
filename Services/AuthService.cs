@@ -79,12 +79,25 @@ public class AuthService : IAuthService
              // Crear el usuario nuevo
              // El ID se genera autimaticamente por FB
 
+            string role = "user";
+            
+            // Si solicita rol de gerente, verificar la clave secreta
+            if (registerDto.Role == "gerente")
+            {
+                var validSecret = _configuration["AdminSecretKey"] ?? "admin123";
+                if (registerDto.SecretKey != validSecret)
+                {
+                    throw new ArgumentException("Clave secreta incorrecta para crear usuario gerente");
+                }
+                role = "gerente";
+            }
+
             var newUser = new User
             {
                 Id = Guid.NewGuid().ToString(), //Generar el id unico
                 Email = registerDto.Email,
                 Fullname = registerDto.FullName,
-                Role = "user", //Por defecto, role de user normal
+                Role = role, //Por defecto, role de user normal
                 TotalRatings = 0,
                 CreatedAt = DateTime.UtcNow,
                 LastLogin = DateTime.UtcNow,
