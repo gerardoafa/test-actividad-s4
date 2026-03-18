@@ -99,7 +99,7 @@ namespace ActividadS4.API.Services
             try
             {
                 // Validar que los datos requeridos existen
-                if (string.IsNullOrWhiteSpace(room.NumberOrName))
+                if (string.IsNullOrWhiteSpace(room.RoomNumber))
                 {
                     throw new ArgumentException("El número o nombre de habitación es requerido");
                 }
@@ -126,7 +126,7 @@ namespace ActividadS4.API.Services
                 var roomData = new Dictionary<string, object>
                 {
                     { "Id", room.Id },
-                    { "NumberOrName", room.NumberOrName },
+                    { "NumberOrName", room.RoomNumber },
                     { "Type", room.Type },
                     { "Capacity", room.Capacity },
                     { "Description", room.Description ?? "" },
@@ -140,7 +140,7 @@ namespace ActividadS4.API.Services
                 var roomsCollection = _firebaseService.GetCollection("rooms");
                 await roomsCollection.Document(room.Id).SetAsync(roomData);
 
-                Console.WriteLine($"Habitación creada: {room.NumberOrName} ({room.Id})");
+                Console.WriteLine($"Habitación creada: {room.RoomNumber} ({room.Id})");
                 return room;
             }
             catch (Exception ex)
@@ -177,7 +177,7 @@ namespace ActividadS4.API.Services
                 var existingRoom = ConvertDictToRoom(existingDict);
 
                 // Actualizar solo los campos permitidos
-                existingRoom.NumberOrName = room.NumberOrName ?? existingRoom.NumberOrName;
+                existingRoom.RoomNumber = room.RoomNumber ?? existingRoom.RoomNumber;
                 existingRoom.Type = room.Type ?? existingRoom.Type;
                 existingRoom.Capacity = room.Capacity > 0 ? room.Capacity : existingRoom.Capacity;
                 existingRoom.Description = room.Description ?? existingRoom.Description;
@@ -187,7 +187,7 @@ namespace ActividadS4.API.Services
                 var roomData = new Dictionary<string, object>
                 {
                     { "Id", existingRoom.Id },
-                    { "NumberOrName", existingRoom.NumberOrName },
+                    { "NumberOrName", existingRoom.RoomNumber },
                     { "Type", existingRoom.Type },
                     { "Capacity", existingRoom.Capacity },
                     { "Description", existingRoom.Description },
@@ -299,7 +299,7 @@ namespace ActividadS4.API.Services
             return new RoomDto
             {
                 Id = room.Id,
-                NumberOrName = room.NumberOrName,
+                NumberOrName = room.RoomNumber,
                 Type = room.Type,
                 Capacity = room.Capacity,
                 Description = room.Description,
@@ -318,7 +318,7 @@ namespace ActividadS4.API.Services
             return new Room
             {
                 Id = dict["Id"].ToString(),
-                NumberOrName = dict["NumberOrName"].ToString(),
+                RoomNumber = dict["NumberOrName"].ToString(),
                 Type = dict["Type"].ToString(),
                 Capacity = (int)(long)dict["Capacity"],
                 Description = dict["Description"].ToString(),

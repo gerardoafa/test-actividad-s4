@@ -118,7 +118,7 @@ namespace ActividadS4.API.Controllers
                     User = new UserDto
                     {
                         Id = user.Id,
-                        FullName = user.FullName,
+                        FullName = user.Fullname,
                         Email = user.Email,
                         Role = user.Role
                     }
@@ -168,7 +168,7 @@ namespace ActividadS4.API.Controllers
                 var userDto = new UserDto
                 {
                     Id = user.Id,
-                    FullName = user.FullName,
+                    FullName = user.Fullname,
                     Email = user.Email,
                     Role = user.Role
                 };
